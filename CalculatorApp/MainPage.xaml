@@ -15,30 +15,37 @@
                HorizontalOptions="End"/>
 
         <!-- Кнопки -->
-        <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="*,*,*,*,*" RowSpacing="10" ColumnSpacing="10">
+        <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="*,*,*,*,*,*" RowSpacing="10" ColumnSpacing="10">
+
             <!-- Ряд 1 -->
-            <Button Text="7" Grid.Row="1" Grid.Column="0" Clicked="OnDigitClicked"/>
-            <Button Text="8" Grid.Row="1" Grid.Column="1" Clicked="OnDigitClicked"/>
-            <Button Text="9" Grid.Row="1" Grid.Column="2" Clicked="OnDigitClicked"/>
+            <Button x:Name="ACButton" Text="C" Grid.Row="1" Grid.Column="0" Clicked="OnACClicked"/>
+            <Button Text="+/-" Grid.Row="1" Grid.Column="1" Clicked="OnToggleSignClicked" />
+            <Button Text="%" Grid.Row="1" Grid.Column="2" Clicked="OnPercentClicked" />
             <Button Text="/" Grid.Row="1" Grid.Column="3" Clicked="OnOperatorClicked"/>
 
             <!-- Ряд 2 -->
-            <Button Text="4" Grid.Row="2" Grid.Column="0" Clicked="OnDigitClicked"/>
-            <Button Text="5" Grid.Row="2" Grid.Column="1" Clicked="OnDigitClicked"/>
-            <Button Text="6" Grid.Row="2" Grid.Column="2" Clicked="OnDigitClicked"/>
+            <Button Text="7" Grid.Row="2" Grid.Column="0" Clicked="OnDigitClicked"/>
+            <Button Text="8" Grid.Row="2" Grid.Column="1" Clicked="OnDigitClicked"/>
+            <Button Text="9" Grid.Row="2" Grid.Column="2" Clicked="OnDigitClicked"/>
             <Button Text="*" Grid.Row="2" Grid.Column="3" Clicked="OnOperatorClicked"/>
 
             <!-- Ряд 3 -->
-            <Button Text="1" Grid.Row="3" Grid.Column="0" Clicked="OnDigitClicked"/>
-            <Button Text="2" Grid.Row="3" Grid.Column="1" Clicked="OnDigitClicked"/>
-            <Button Text="3" Grid.Row="3" Grid.Column="2" Clicked="OnDigitClicked"/>
+            <Button Text="4" Grid.Row="3" Grid.Column="0" Clicked="OnDigitClicked"/>
+            <Button Text="5" Grid.Row="3" Grid.Column="1" Clicked="OnDigitClicked"/>
+            <Button Text="6" Grid.Row="3" Grid.Column="2" Clicked="OnDigitClicked"/>
             <Button Text="-" Grid.Row="3" Grid.Column="3" Clicked="OnOperatorClicked"/>
 
             <!-- Ряд 4 -->
-            <Button Text="0" Grid.Row="4" Grid.Column="0" Clicked="OnDigitClicked"/>
-            <Button Text="C" Grid.Row="4" Grid.Column="1" Clicked="OnClearClicked"/>
-            <Button Text="=" Grid.Row="4" Grid.Column="2" Clicked="OnEqualsClicked"/>
+            <Button Text="1" Grid.Row="4" Grid.Column="0" Clicked="OnDigitClicked"/>
+            <Button Text="2" Grid.Row="4" Grid.Column="1" Clicked="OnDigitClicked"/>
+            <Button Text="3" Grid.Row="4" Grid.Column="2" Clicked="OnDigitClicked"/>
             <Button Text="+" Grid.Row="4" Grid.Column="3" Clicked="OnOperatorClicked"/>
+
+            <!-- Ряд 5 -->
+            <Button Text="0" Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Clicked="OnDigitClicked"/>
+            <Button Text="." Grid.Row="5" Grid.Column="2" Clicked="OnDecimalPointClicked"/>
+            <Button Text="=" Grid.Row="5" Grid.Column="3" Clicked="OnEqualsClicked"/>
+
         </Grid>
     </VerticalStackLayout>
 </ContentPage>
