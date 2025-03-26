@@ -26,12 +26,23 @@ namespace CalculatorApp
 
             if (_isNewInput)
             {
-                _currentInput = digit;
+                // Очищаємо історію ТІЛЬКИ якщо це не продовження виразу
+                if (_calculator.PendingOperator == '\0' && !string.IsNullOrEmpty(_fullExpression))
+                {
+                    _fullExpression = "";
+                }
+
+                _currentInput = digit == "0" ? "0" : digit;
                 _isNewInput = false;
                 _hasDecimalPoint = false;
             }
-            else if (!(_currentInput == "0" && digit == "0"))
+            else
             {
+                if (_currentInput == "0" && digit != ".")
+                {
+                    return;
+                }
+
                 _currentInput += digit;
             }
 
@@ -40,9 +51,10 @@ namespace CalculatorApp
 
         private void OnToggleSignClicked(object sender, EventArgs e)
         {
-            if (_calculator.ErrorState || string.IsNullOrEmpty(_currentInput))
+            if (_calculator.ErrorState || string.IsNullOrEmpty(_currentInput) || _currentInput == "0")
                 return;
 
+            // Інший код залишається без змін...
             if (_calculator.PendingOperator == '\0' && !string.IsNullOrEmpty(_fullExpression))
             {
                 _fullExpression = "";
@@ -89,18 +101,31 @@ namespace CalculatorApp
                     OnEqualsClicked(sender, e);
                 }
 
-                double number = double.Parse(_currentInput, NumberStyles.Any, CultureInfo.InvariantCulture);
+                // Додаємо дужки для від'ємних чисел
+                string displayNumber = _currentInput;
+                if (_currentInput.StartsWith('-'))
+                {
+                    displayNumber = $"({_currentInput})";
+                }
+
+                double number = double.Parse(_currentInput, CultureInfo.InvariantCulture);
                 _calculator.SetOperation(number, newOperator);
-                _fullExpression = $"{number.ToString(CultureInfo.InvariantCulture)} {newOperator} ";
+                _fullExpression = $"{displayNumber} {newOperator} ";
             }
             else if (_calculator.PendingOperator != '\0')
             {
+                // Зміна оператора без нового числа
+                string displayNumber = _calculator.StoredNumber < 0
+                    ? $"({_calculator.StoredNumber})"
+                    : _calculator.StoredNumber.ToString(CultureInfo.InvariantCulture);
+
                 _calculator.SetOperation(_calculator.StoredNumber, newOperator);
-                _fullExpression = $"{_calculator.StoredNumber.ToString(CultureInfo.InvariantCulture)} {newOperator} ";
+                _fullExpression = $"{displayNumber} {newOperator} ";
             }
 
             _isNewInput = true;
             _currentInput = "";
+            _hasDecimalPoint = false;
             UpdateDisplay();
         }
 
@@ -180,7 +205,16 @@ namespace CalculatorApp
 
             double secondNumber = string.IsNullOrEmpty(_currentInput)
                 ? _calculator.StoredNumber
-                : double.Parse(_currentInput, NumberStyles.Any, CultureInfo.InvariantCulture);
+                : double.Parse(_currentInput, CultureInfo.InvariantCulture);
+
+            // Форматування для історії
+            string firstNum = _calculator.StoredNumber < 0
+                ? $"({_calculator.StoredNumber})"
+                : _calculator.StoredNumber.ToString(CultureInfo.InvariantCulture);
+
+            string secondNum = secondNumber < 0
+                ? $"({secondNumber})"
+                : secondNumber.ToString(CultureInfo.InvariantCulture);
 
             char currentOperator = _calculator.PendingOperator;
             double result = _calculator.Calculate(secondNumber);
@@ -191,7 +225,7 @@ namespace CalculatorApp
                 return;
             }
 
-            _fullExpression = $"{_calculator.StoredNumber.ToString(CultureInfo.InvariantCulture)} {currentOperator} {secondNumber.ToString(CultureInfo.InvariantCulture)} =";
+            _fullExpression = $"{firstNum} {currentOperator} {secondNum} =";
             _currentInput = result.ToString(CultureInfo.InvariantCulture);
             _isNewInput = true;
             UpdateDisplay();
