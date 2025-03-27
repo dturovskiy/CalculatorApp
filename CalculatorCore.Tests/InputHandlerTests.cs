@@ -178,10 +178,11 @@ namespace CalculatorCore.Tests
             Assert.Equal(expected, handler.FullExpression);
         }
 
-        private void ProcessInputWithSign(IInputHandler handler, string input)
+
+        private static void ProcessInputWithSign(InputHandler handler, string input)
         {
-            bool isNegative = input.StartsWith("-");
-            string number = isNegative ? input.Substring(1) : input;
+            bool isNegative = input.StartsWith('-');
+            string number = isNegative ? input[1..] : input;
 
             // Введення цифр та крапки
             foreach (var c in number)

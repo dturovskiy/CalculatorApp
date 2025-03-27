@@ -3,7 +3,7 @@ using System.Globalization;
 
 namespace CalculatorCore
 {
-    public class InputHandler : IInputHandler
+    public class InputHandler(ICalculatorEngine calculator) : IInputHandler
     {
         private string _currentInput = "";
         private string _fullExpression = "";
@@ -11,17 +11,12 @@ namespace CalculatorCore
         private bool _hasDecimalPoint = false;
         private bool _errorState = false;
 
-        private readonly ICalculatorEngine _calculator;
+        private readonly ICalculatorEngine _calculator = calculator;
 
         public string CurrentInput => _currentInput;
         public string FullExpression => _fullExpression;
         public bool IsNewInput => _isNewInput;
         public bool ErrorState => _errorState;
-
-        public InputHandler(ICalculatorEngine calculator)
-        {
-            _calculator = calculator;
-        }
 
         public void HandleDigit(string digit)
         {
@@ -146,7 +141,7 @@ namespace CalculatorCore
             if (_errorState || string.IsNullOrEmpty(_fullExpression))
                 return;
 
-            if (_fullExpression.Contains("=") || !_fullExpression.Contains(" "))
+            if (_fullExpression.Contains('=') || !_fullExpression.Contains(' '))
                 return;
 
             // Отримуємо оператор
@@ -193,23 +188,23 @@ namespace CalculatorCore
         }
 
         // Допоміжні методи
-        private string FormatForHistory(string numberStr)
+        private static string FormatForHistory(string numberStr)
         {
             if (string.IsNullOrEmpty(numberStr))
                 return "0";
 
             // Якщо число вже має дужки, повертаємо як є
-            if (numberStr.StartsWith("(") && numberStr.EndsWith(")"))
+            if (numberStr.StartsWith('(') && numberStr.EndsWith(')'))
                 return numberStr;
 
             // Якщо число від'ємне, додаємо дужки
-            if (numberStr.StartsWith("-"))
+            if (numberStr.StartsWith('-'))
                 return $"({numberStr})";
 
             return numberStr;
         }
 
-        private double ParseNumber(string numberStr)
+        private static double ParseNumber(string numberStr)
         {
             if (string.IsNullOrEmpty(numberStr))
                 return 0;
