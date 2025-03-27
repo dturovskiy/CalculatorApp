@@ -1,10 +1,10 @@
-﻿using CalculatorApp.Services;
+﻿using CalculatorCore;
 
 namespace CalculatorApp
 {
     public partial class MainPage : ContentPage
     {
-        private readonly IInputHandler _inputHandler;
+        private readonly InputHandler _inputHandler;
 
         public MainPage()
         {

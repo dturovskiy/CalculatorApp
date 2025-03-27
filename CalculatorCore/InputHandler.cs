@@ -1,6 +1,6 @@
-﻿using CalculatorApp.Services;
+﻿using CalculatorCore.Services;
 
-namespace CalculatorApp
+namespace CalculatorCore
 {
     public class InputHandler : IInputHandler
     {
@@ -21,8 +21,7 @@ namespace CalculatorApp
 
             if (_isNewInput)
             {
-                // Якщо введення починається після "=" (тобто історія завершена), очистити її
-                if (_fullExpression.Contains("="))
+                if (_fullExpression.Contains('='))
                 {
                     _fullExpression = "";
                 }
@@ -34,7 +33,9 @@ namespace CalculatorApp
             else
             {
                 if (_currentInput == "0" && digit != ".")
+                {
                     return;
+                }
 
                 _currentInput += digit;
             }
@@ -44,13 +45,25 @@ namespace CalculatorApp
         {
             if (_errorState) return;
 
+            if (string.IsNullOrEmpty(_currentInput) && _fullExpression.Contains('='))
+            {
+                _currentInput = _fullExpression.Split('=')[1].Trim();
+                _fullExpression = "";
+            }
+
             if (!string.IsNullOrEmpty(_currentInput))
             {
-                // Тут буде логіка обробки оператора (пізніше додамо CalculatorEngine)
-                _fullExpression = $"{_currentInput} {op} ";
+                string displayNumber = _currentInput.StartsWith('-')
+                    ? $"({_currentInput})"
+                    : _currentInput;
+
+                _fullExpression = $"{displayNumber} {op} ";
                 _isNewInput = true;
                 _currentInput = "";
-                _hasDecimalPoint = false;
+            }
+            else if (!string.IsNullOrEmpty(_fullExpression) && !_fullExpression.Contains('='))
+            {
+                _fullExpression = _fullExpression[..^2] + op + " ";
             }
         }
 
@@ -76,7 +89,7 @@ namespace CalculatorApp
             if (_errorState || string.IsNullOrEmpty(_currentInput)) return;
 
             _currentInput = _currentInput.StartsWith('-')
-                ? _currentInput.Substring(1)
+                ? _currentInput[1..]
                 : $"-{_currentInput}";
         }
 
@@ -88,18 +101,33 @@ namespace CalculatorApp
             }
             else
             {
-                _currentInput = _currentInput.Length > 1
-                    ? _currentInput[..^1]
-                    : "0";
+                _currentInput = _currentInput[..^1];
+
+                if (_currentInput == "0" || string.IsNullOrEmpty(_currentInput))
+                {
+                    _isNewInput = true;
+                    _currentInput = "";
+                }
             }
         }
 
         public void HandleEquals()
         {
-            if (_errorState) return;
+            if (_errorState || string.IsNullOrEmpty(_fullExpression))
+                return;
 
-            // Тут буде логіка обчислення (пізніше додамо CalculatorEngine)
-            _fullExpression = $"{_fullExpression} {_currentInput} =";
+            if (_fullExpression.Contains('=') || !_fullExpression.Contains(' '))
+                return;
+
+            string currentNumber = string.IsNullOrEmpty(_currentInput)
+                ? "0"
+                : _currentInput;
+
+            string displayNumber = currentNumber.StartsWith('-')
+                ? $"({currentNumber})"
+                : currentNumber;
+
+            _fullExpression = $"{_fullExpression}{displayNumber} =";
             _isNewInput = true;
         }
 
