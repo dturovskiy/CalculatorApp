@@ -1,6 +1,8 @@
-﻿namespace CalculatorApp
+﻿using CalculatorCore.Services;
+
+namespace CalculatorCore
 {
-    public class CalculatorEngine
+    public class CalculatorEngine : ICalculatorEngine
     {
         private double _storedNumber = 0;
         private char _pendingOperator = '\0'; // '\0' — ознака відсутності оператора
@@ -21,6 +23,7 @@
         }
 
         public char PendingOperator => _pendingOperator;
+        public bool HasPendingOperation => _pendingOperator != '\0';
         public bool ErrorState => _errorState;
 
         /// <summary>

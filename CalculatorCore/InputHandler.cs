@@ -1,4 +1,5 @@
 ﻿using CalculatorCore.Services;
+using System.Globalization;
 
 namespace CalculatorCore
 {
@@ -10,14 +11,31 @@ namespace CalculatorCore
         private bool _hasDecimalPoint = false;
         private bool _errorState = false;
 
+        private readonly ICalculatorEngine _calculator;
+
         public string CurrentInput => _currentInput;
         public string FullExpression => _fullExpression;
         public bool IsNewInput => _isNewInput;
         public bool ErrorState => _errorState;
 
+        public InputHandler(ICalculatorEngine calculator)
+        {
+            _calculator = calculator;
+        }
+
         public void HandleDigit(string digit)
         {
-            if (_errorState) return;
+            if (_errorState)
+            {
+                Reset(); // Автоматичний скид при помилці
+                return;
+            }
+
+            // Перевірка, чи digit складається лише з однієї цифри (0-9)
+            if (digit.Length != 1 || !char.IsDigit(digit[0]))
+            {
+                return; // Ігноруємо недопустиме введення
+            }
 
             if (_isNewInput)
             {
@@ -43,7 +61,11 @@ namespace CalculatorCore
 
         public void HandleOperator(char op)
         {
-            if (_errorState) return;
+            if (_errorState)
+            {
+                Reset(); // Автоматичний скид при помилці
+                return;
+            }
 
             if (string.IsNullOrEmpty(_currentInput) && _fullExpression.Contains('='))
             {
@@ -69,7 +91,11 @@ namespace CalculatorCore
 
         public void HandleDecimalPoint()
         {
-            if (_errorState) return;
+            if (_errorState)
+            {
+                Reset(); // Автоматичний скид при помилці
+                return;
+            }
 
             if (_isNewInput)
             {
@@ -116,18 +142,35 @@ namespace CalculatorCore
             if (_errorState || string.IsNullOrEmpty(_fullExpression))
                 return;
 
-            if (_fullExpression.Contains('=') || !_fullExpression.Contains(' '))
+            // Ігноруємо, якщо вже є "=" або немає оператора
+            if (_fullExpression.Contains("=") || !_fullExpression.Contains(" "))
                 return;
 
-            string currentNumber = string.IsNullOrEmpty(_currentInput)
-                ? "0"
-                : _currentInput;
+            // Парсимо число (або 0, якщо поле порожнє)
+            string currentNumber = string.IsNullOrEmpty(_currentInput) ? "0" : _currentInput;
+            double number = double.Parse(currentNumber, CultureInfo.InvariantCulture);
 
-            string displayNumber = currentNumber.StartsWith('-')
-                ? $"({currentNumber})"
-                : currentNumber;
+            // Отримуємо перше число з історії (для CalculatorEngine)
+            string firstPart = _fullExpression.Split(' ')[0];
+            double firstNumber = double.Parse(
+                firstPart.StartsWith("(") ? firstPart[1..^1] : firstPart,
+                CultureInfo.InvariantCulture
+            );
 
-            _fullExpression = $"{_fullExpression}{displayNumber} =";
+            // Викликаємо CalculatorEngine
+            _calculator.SetOperation(firstNumber, _fullExpression.Split(' ')[1][0]);
+            double result = _calculator.Calculate(number);
+
+            if (_calculator.ErrorState)
+            {
+                _errorState = true;
+                _currentInput = "ERROR";
+            }
+            else
+            {
+                _currentInput = result.ToString(CultureInfo.InvariantCulture);
+                _fullExpression = $"{_fullExpression}{currentNumber} =";
+            }
             _isNewInput = true;
         }
 

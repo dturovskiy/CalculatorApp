@@ -1,4 +1,5 @@
 ﻿using CalculatorCore;
+using CalculatorCore.Services;
 
 namespace CalculatorApp
 {
@@ -6,10 +7,10 @@ namespace CalculatorApp
     {
         private readonly InputHandler _inputHandler;
 
-        public MainPage()
+        public MainPage(IInputHandler inputHandler)
         {
             InitializeComponent();
-            _inputHandler = new InputHandler();
+            _inputHandler = (InputHandler)inputHandler;
             UpdateDisplay();
         }
 
