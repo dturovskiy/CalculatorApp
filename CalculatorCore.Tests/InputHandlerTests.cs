@@ -151,5 +151,87 @@ namespace CalculatorCore.Tests
             Assert.True(_handler.IsNewInput);
             Assert.False(_handler.ErrorState);
         }
+
+        [Theory]
+        [InlineData("5", "+", "3", "5 + 3 =")]
+        [InlineData("5", "+", "-3", "5 + (-3) =")]
+        [InlineData("-5", "+", "3", "(-5) + 3 =")]
+        [InlineData("-5", "+", "-3", "(-5) + (-3) =")]
+        [InlineData("5", "-", "-3", "5 - (-3) =")]
+        [InlineData("5.2", "+", "-3.1", "5.2 + (-3.1) =")]
+        public void Test_ExpressionFormatting(string first, string op, string second, string expected)
+        {
+            var handler = new InputHandler(new CalculatorEngine());
+
+            // Обробка першого числа
+            ProcessInputWithSign(handler, first);
+
+            // Введення оператора
+            handler.HandleOperator(op[0]);
+
+            // Обробка другого числа
+            ProcessInputWithSign(handler, second);
+
+            // Обчислення
+            handler.HandleEquals();
+
+            Assert.Equal(expected, handler.FullExpression);
+        }
+
+        private void ProcessInputWithSign(IInputHandler handler, string input)
+        {
+            bool isNegative = input.StartsWith("-");
+            string number = isNegative ? input.Substring(1) : input;
+
+            // Введення цифр та крапки
+            foreach (var c in number)
+            {
+                if (c == '.')
+                    handler.HandleDecimalPoint();
+                else
+                    handler.HandleDigit(c.ToString());
+            }
+
+            // Додаємо мінус в кінці (як це робить UI)
+            if (isNegative)
+            {
+                handler.HandleToggleSign();
+            }
+        }
+
+        [Fact]
+        public void HandleToggleSign_AddsParenthesesInHistory()
+        {
+            // Arrange
+            var engine = new CalculatorEngine();
+            var handler = new InputHandler(engine);
+
+            // Act
+            handler.HandleDigit("5");
+            handler.HandleOperator('+');
+            handler.HandleDigit("3");
+            handler.HandleToggleSign(); // Змінюємо 3 на -3
+            handler.HandleEquals();
+
+            // Assert
+            Assert.Equal("5 + (-3) =", handler.FullExpression);
+        }
+
+        [Fact]
+        public void AfterEquals_DecimalOrSign_ClearsHistory()
+        {
+            var handler = new InputHandler(new CalculatorEngine());
+
+            // 5 + 3 = 8
+            handler.HandleDigit("5");
+            handler.HandleOperator('+');
+            handler.HandleDigit("3");
+            handler.HandleEquals();
+
+            // Натискаємо . після =
+            handler.HandleDecimalPoint();
+            Assert.Equal("0.", handler.CurrentInput);
+            Assert.Equal("", handler.FullExpression); // Історія очищена!
+        }
     }
 }

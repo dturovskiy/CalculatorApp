@@ -63,7 +63,7 @@ namespace CalculatorCore
         {
             if (_errorState)
             {
-                Reset(); // Автоматичний скид при помилці
+                Reset();
                 return;
             }
 
@@ -75,16 +75,15 @@ namespace CalculatorCore
 
             if (!string.IsNullOrEmpty(_currentInput))
             {
-                string displayNumber = _currentInput.StartsWith('-')
-                    ? $"({_currentInput})"
-                    : _currentInput;
-
+                // Форматуємо число для історії
+                string displayNumber = FormatForHistory(_currentInput);
                 _fullExpression = $"{displayNumber} {op} ";
                 _isNewInput = true;
                 _currentInput = "";
             }
             else if (!string.IsNullOrEmpty(_fullExpression) && !_fullExpression.Contains('='))
             {
+                // Зміна оператора
                 _fullExpression = _fullExpression[..^2] + op + " ";
             }
         }
@@ -93,13 +92,13 @@ namespace CalculatorCore
         {
             if (_errorState)
             {
-                Reset(); // Автоматичний скид при помилці
                 return;
             }
 
             if (_isNewInput)
             {
                 _currentInput = "0.";
+                _fullExpression = "";
                 _isNewInput = false;
                 _hasDecimalPoint = true;
             }
@@ -113,6 +112,11 @@ namespace CalculatorCore
         public void HandleToggleSign()
         {
             if (_errorState || string.IsNullOrEmpty(_currentInput)) return;
+
+            if (_isNewInput && !string.IsNullOrEmpty(_fullExpression))
+            {
+                _fullExpression = "";
+            }
 
             _currentInput = _currentInput.StartsWith('-')
                 ? _currentInput[1..]
@@ -142,24 +146,22 @@ namespace CalculatorCore
             if (_errorState || string.IsNullOrEmpty(_fullExpression))
                 return;
 
-            // Ігноруємо, якщо вже є "=" або немає оператора
             if (_fullExpression.Contains("=") || !_fullExpression.Contains(" "))
                 return;
 
-            // Парсимо число (або 0, якщо поле порожнє)
-            string currentNumber = string.IsNullOrEmpty(_currentInput) ? "0" : _currentInput;
-            double number = double.Parse(currentNumber, CultureInfo.InvariantCulture);
+            // Отримуємо оператор
+            char op = _fullExpression.Split(' ')[1][0];
 
-            // Отримуємо перше число з історії (для CalculatorEngine)
+            // Парсимо перше число
             string firstPart = _fullExpression.Split(' ')[0];
-            double firstNumber = double.Parse(
-                firstPart.StartsWith("(") ? firstPart[1..^1] : firstPart,
-                CultureInfo.InvariantCulture
-            );
+            double firstNumber = ParseNumber(firstPart);
 
-            // Викликаємо CalculatorEngine
-            _calculator.SetOperation(firstNumber, _fullExpression.Split(' ')[1][0]);
-            double result = _calculator.Calculate(number);
+            // Парсимо друге число (поточний ввід)
+            double secondNumber = ParseNumber(_currentInput);
+
+            // Обчислення
+            _calculator.SetOperation(firstNumber, op);
+            double result = _calculator.Calculate(secondNumber);
 
             if (_calculator.ErrorState)
             {
@@ -169,7 +171,14 @@ namespace CalculatorCore
             else
             {
                 _currentInput = result.ToString(CultureInfo.InvariantCulture);
-                _fullExpression = $"{_fullExpression}{currentNumber} =";
+
+                // Форматуємо друге число для історії (з дужками якщо від'ємне)
+                string formattedSecondNumber = secondNumber < 0
+                    ? $"({secondNumber.ToString(CultureInfo.InvariantCulture)})"
+                    : secondNumber.ToString(CultureInfo.InvariantCulture);
+
+                // Оновлюємо історію
+                _fullExpression = $"{FormatForHistory(firstPart)} {op} {formattedSecondNumber} =";
             }
             _isNewInput = true;
         }
@@ -181,6 +190,33 @@ namespace CalculatorCore
             _isNewInput = true;
             _hasDecimalPoint = false;
             _errorState = false;
+        }
+
+        // Допоміжні методи
+        private string FormatForHistory(string numberStr)
+        {
+            if (string.IsNullOrEmpty(numberStr))
+                return "0";
+
+            // Якщо число вже має дужки, повертаємо як є
+            if (numberStr.StartsWith("(") && numberStr.EndsWith(")"))
+                return numberStr;
+
+            // Якщо число від'ємне, додаємо дужки
+            if (numberStr.StartsWith("-"))
+                return $"({numberStr})";
+
+            return numberStr;
+        }
+
+        private double ParseNumber(string numberStr)
+        {
+            if (string.IsNullOrEmpty(numberStr))
+                return 0;
+
+            // Видаляємо дужки якщо вони є
+            string cleanNumber = numberStr.Replace("(", "").Replace(")", "");
+            return double.Parse(cleanNumber, CultureInfo.InvariantCulture);
         }
     }
 }
