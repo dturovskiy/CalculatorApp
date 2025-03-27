@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using CalculatorCore;
+using CalculatorCore.Services;
+using Microsoft.Extensions.Logging;
 
 namespace CalculatorApp
 {
@@ -15,8 +17,13 @@ namespace CalculatorApp
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
+            // Add your services here
+            builder.Services
+                .AddSingleton<ICalculatorEngine, CalculatorEngine>()
+                .AddSingleton<IInputHandler, InputHandler>();
+
 #if DEBUG
-    		builder.Logging.AddDebug();
+            builder.Logging.AddDebug();
 #endif
 
             return builder.Build();
