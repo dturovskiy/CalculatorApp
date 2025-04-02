@@ -22,23 +22,16 @@ namespace CalculatorCore
         {
             if (_errorState)
             {
-                Reset(); // Автоматичний скид при помилці
+                Reset();
                 return;
             }
 
-            // Перевірка, чи digit складається лише з однієї цифри (0-9)
-            if (digit.Length != 1 || !char.IsDigit(digit[0]))
-            {
-                return; // Ігноруємо недопустиме введення
-            }
+            if (digit.Length != 1 || !char.IsDigit(digit[0])) return;
 
             if (_isNewInput)
             {
-                if (_fullExpression.Contains('='))
-                {
-                    _fullExpression = "";
-                }
-
+                // Завжди починаємо нове введення, незалежно від _fullExpression
+                _fullExpression = _fullExpression.Contains('=') ? "" : _fullExpression;
                 _currentInput = digit == "0" ? "0" : digit;
                 _isNewInput = false;
                 _hasDecimalPoint = false;
@@ -49,7 +42,6 @@ namespace CalculatorCore
                 {
                     return;
                 }
-
                 _currentInput += digit;
             }
         }
@@ -61,6 +53,9 @@ namespace CalculatorCore
                 Reset();
                 return;
             }
+
+            // Якщо вже є вираз з % (A% B), ігноруємо оператор
+            if (_fullExpression.Contains('%')) return;
 
             if (string.IsNullOrEmpty(_currentInput) && _fullExpression.Contains('='))
             {
@@ -136,25 +131,123 @@ namespace CalculatorCore
             }
         }
 
+        public void HandlePercent()
+        {
+            if (_errorState || string.IsNullOrEmpty(_currentInput)) return;
+            if (_currentInput.Contains('%')) return;
+
+            // Просто додаємо % до поточного введення
+            _currentInput += "%";
+            _isNewInput = false;
+        }
+
         public void HandleEquals()
         {
-            if (_errorState || string.IsNullOrEmpty(_fullExpression))
-                return;
+            if (_errorState || string.IsNullOrEmpty(_currentInput)) return;
 
-            if (_fullExpression.Contains('=') || !_fullExpression.Contains(' '))
-                return;
+            try
+            {
+                ExpressionType type = DetermineExpressionType();
 
-            // Отримуємо оператор
-            char op = _fullExpression.Split(' ')[1][0];
+                switch (type)
+                {
+                    case ExpressionType.PercentOperation:
+                    case ExpressionType.PercentOfNumber:
+                    case ExpressionType.StandalonePercent:
+                        ProcessPercentCalculation();
+                        break;
+                    case ExpressionType.RegularOperation:
+                        ProcessRegularCalculation();
+                        break;
+                    default:
+                        _errorState = true;
+                        _currentInput = "ERROR";
+                        break;
+                }
+            }
+            catch
+            {
+                _errorState = true;
+                _currentInput = "ERROR";
+            }
+            finally
+            {
+                _isNewInput = true;
+            }
+        }
 
-            // Парсимо перше число
-            string firstPart = _fullExpression.Split(' ')[0];
-            double firstNumber = ParseNumber(firstPart);
+        private void ProcessPercentCalculation()
+        {
+            switch (DetermineExpressionType())
+            {
+                case ExpressionType.StandalonePercent:
+                    double simplePercent = ParseNumber(_currentInput.TrimEnd('%'));
+                    _currentInput = FormatNumber(_calculator.CalculateSimplePercent(simplePercent));
+                    _fullExpression = $"{FormatNumber(simplePercent)}% =";
+                    break;
 
-            // Парсимо друге число (поточний ввід)
+                case ExpressionType.PercentOperation:
+                    var opParts = _fullExpression.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (opParts.Length < 2)
+                    {
+                        _errorState = true;
+                        _currentInput = "ERROR";
+                        break;
+                    }
+
+                    double baseNum = ParseNumber(opParts[0]);
+                    char operation = opParts[1][0];
+                    double percent = ParseNumber(_currentInput.TrimEnd('%'));
+
+                    _calculator.SetOperation(baseNum, operation); // Фікс: передаємо baseNum!
+                    double result = _calculator.CalculateWithPercent(percent);
+
+                    _currentInput = FormatNumber(result);
+                    _fullExpression = $"{FormatForHistory(FormatNumber(baseNum))} {operation} {percent}% =";
+                    break;
+
+                case ExpressionType.PercentOfNumber:
+                    // Розділяємо введений рядок на частини (A% B)
+                    string[] parts = _currentInput.Split(new[] { '%' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length != 2)
+                    {
+                        _errorState = true;
+                        _currentInput = "ERROR";
+                        break;
+                    }
+
+                    string percentPart = parts[0].Trim();
+                    string numberPart = parts[1].Trim();
+
+                    if (!double.TryParse(percentPart, NumberStyles.Any, CultureInfo.InvariantCulture, out double percentOf) ||
+                        !double.TryParse(numberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out double number))
+                    {
+                        _errorState = true;
+                        _currentInput = "ERROR";
+                        break;
+                    }
+
+                    double calculated = _calculator.CalculatePercentOfNumber(percentOf, number);
+                    _currentInput = FormatNumber(calculated);
+                    _fullExpression = $"{percentPart}%{FormatNumber(number)} =";
+                    break;
+
+                default:
+                    _errorState = true;
+                    _currentInput = "ERROR";
+                    break;
+            }
+        }
+
+        private void ProcessRegularCalculation()
+        {
+            if (string.IsNullOrEmpty(_fullExpression) || _fullExpression.Contains('=')) return;
+
+            var parts = _fullExpression.Split(' ');
+            double firstNumber = ParseNumber(parts[0]);
+            char op = parts[1][0];
             double secondNumber = ParseNumber(_currentInput);
 
-            // Обчислення
             _calculator.SetOperation(firstNumber, op);
             double result = _calculator.Calculate(secondNumber);
 
@@ -165,17 +258,17 @@ namespace CalculatorCore
             }
             else
             {
-                _currentInput = result.ToString(CultureInfo.InvariantCulture);
-
-                // Форматуємо друге число для історії (з дужками якщо від'ємне)
-                string formattedSecondNumber = secondNumber < 0
-                    ? $"({secondNumber.ToString(CultureInfo.InvariantCulture)})"
-                    : secondNumber.ToString(CultureInfo.InvariantCulture);
-
-                // Оновлюємо історію
-                _fullExpression = $"{FormatForHistory(firstPart)} {op} {formattedSecondNumber} =";
+                _currentInput = FormatNumber(result);
+                _fullExpression = $"{FormatForHistory(parts[0])} {op} {FormatSecondNumber(secondNumber)} =";
             }
-            _isNewInput = true;
+        }
+
+
+        private string FormatSecondNumber(double number)
+        {
+            return number < 0
+                ? $"({FormatNumber(number)})" // Змінено тут
+                 : FormatNumber(number); // І тут
         }
 
         public void Reset()
@@ -212,6 +305,44 @@ namespace CalculatorCore
             // Видаляємо дужки якщо вони є
             string cleanNumber = numberStr.Replace("(", "").Replace(")", "");
             return double.Parse(cleanNumber, CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatNumber(double number)
+        {
+            // Форматуємо з InvariantCulture і обрізаємо зайві нулі після крапки
+            string formatted = number.ToString("0.###############", CultureInfo.InvariantCulture);
+            return formatted;
+        }
+
+        private ExpressionType DetermineExpressionType()
+        {
+            bool hasOperator = _fullExpression.Contains(" + ") ||
+                              _fullExpression.Contains(" - ") ||
+                              _fullExpression.Contains(" * ") ||
+                              _fullExpression.Contains(" / ");
+
+            bool currentEndsWithPercent = _currentInput.EndsWith("%");
+            bool currentHasPercent = _currentInput.Contains("%");
+            bool historyHasPercent = _fullExpression.Contains("%");
+            bool historyEndsWithPercent = _fullExpression.TrimEnd().EndsWith("%");
+
+            // 1. A% (Standalone)
+            if (currentEndsWithPercent && !hasOperator && !historyHasPercent)
+                return ExpressionType.StandalonePercent;
+
+            // 2. A + B% (Operation with percent)
+            if (currentEndsWithPercent && hasOperator)
+                return ExpressionType.PercentOperation;
+
+            // 3. A% B (Percent of number)
+            if (currentHasPercent && !currentEndsWithPercent && !hasOperator)
+                return ExpressionType.PercentOfNumber;
+
+            // 4. Regular operation
+            if (hasOperator)
+                return ExpressionType.RegularOperation;
+
+            return ExpressionType.Unknown;
         }
     }
 }

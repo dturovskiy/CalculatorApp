@@ -5,46 +5,27 @@ namespace CalculatorCore
     public class CalculatorEngine : ICalculatorEngine
     {
         private double _storedNumber = 0;
-        private char _pendingOperator = '\0'; // '\0' — ознака відсутності оператора
+        private char _pendingOperator = '\0';
         private bool _errorState = false;
 
-        // Публічні властивості для доступу до стану
-        public double StoredNumber
-        {
-            get
-            {
-                return _storedNumber;
-            }
-
-            set
-            {
-                _storedNumber = value;
-            }
-        }
-
+        public double StoredNumber => _storedNumber;
         public char PendingOperator => _pendingOperator;
         public bool HasPendingOperation => _pendingOperator != '\0';
         public bool ErrorState => _errorState;
 
-        /// <summary>
-        /// Зберігає число та оператор для майбутнього обчислення.
-        /// </summary>
         public void SetOperation(double number, char operation)
         {
             if (!IsValidOperator(operation))
-                throw new ArgumentException("Невірний оператор");
+                throw new ArgumentException("Invalid operator. Allowed: +, -, *, /");
 
             _storedNumber = number;
             _pendingOperator = operation;
             _errorState = false;
         }
 
-        /// <summary>
-        /// Виконує обчислення між збереженим числом і другим числом.
-        /// </summary>
         public double Calculate(double secondNumber)
         {
-            if (_errorState || _pendingOperator == '\0')
+            if (_errorState || !HasPendingOperation)
                 return 0;
 
             try
@@ -56,7 +37,7 @@ namespace CalculatorCore
                     '*' => _storedNumber * secondNumber,
                     '/' => secondNumber != 0 ? _storedNumber / secondNumber
                            : throw new DivideByZeroException(),
-                    _ => throw new InvalidOperationException("Невідомий оператор")
+                    _ => throw new InvalidOperationException("Unknown operator")
                 };
             }
             catch (Exception ex) when (ex is DivideByZeroException or InvalidOperationException)
@@ -66,13 +47,63 @@ namespace CalculatorCore
             }
             finally
             {
+                _pendingOperator = '\0';
+            }
+        }
+
+        public double CalculateSimplePercent(double number) => number / 100;
+
+        public double CalculatePercentOfNumber(double percent, double number)
+        {
+            // Логування значень перед обчисленням
+            Console.WriteLine($"Percent: {percent}, Number: {number}");
+
+            double result = (percent / 100) * number;
+
+            // Логування результату
+            Console.WriteLine($"Calculated Result: {result}");
+
+            return result;
+        }
+
+
+        public double CalculateWithPercent(double percent)
+        {
+            if (!HasPendingOperation)
+            {
+                _errorState = true;
+                throw new InvalidOperationException("No pending operation");
+            }
+
+            try
+            {
+                double percentValue = _pendingOperator switch
+                {
+                    '+' => _storedNumber * (1 + percent / 100),
+                    '-' => _storedNumber * (1 - percent / 100),
+                    '*' => _storedNumber * (percent / 100),
+                    '/' => percent != 0 ? _storedNumber / (percent / 100)
+                           : throw new DivideByZeroException("Division by zero"),
+                    _ => throw new InvalidOperationException($"Unsupported operator '{_pendingOperator}' for percentage")
+                };
+
+                // Округлення до 12 знаків для уникнення проблем з плаваючою комою
+                double roundedValue = Math.Round(percentValue, 12);
+
+                // Якщо після округлення число ціле, повертаємо без дробової частини
+                return roundedValue % 1 == 0 ? Math.Truncate(roundedValue) : roundedValue;
+            }
+            catch (Exception)
+            {
+                _errorState = true;
+                throw;
+            }
+            finally
+            {
                 _pendingOperator = '\0'; // Скидаємо оператор після обчислення
             }
         }
 
-        /// <summary>
-        /// Скидає стан калькулятора.
-        /// </summary>
         public void Reset()
         {
             _storedNumber = 0;
@@ -80,10 +111,6 @@ namespace CalculatorCore
             _errorState = false;
         }
 
-        // Перевіряє, чи оператор є допустимим
-        private static bool IsValidOperator(char op)
-        {
-            return op is '+' or '-' or '*' or '/';
-        }
+        private static bool IsValidOperator(char op) => op is '+' or '-' or '*' or '/';
     }
 }

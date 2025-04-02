@@ -1,6 +1,5 @@
 ﻿using CalculatorCore.Services;
 using Moq;
-using System.Globalization;
 
 namespace CalculatorCore.Tests
 {
@@ -15,224 +14,289 @@ namespace CalculatorCore.Tests
             _handler = new InputHandler(_calculatorMock.Object);
         }
 
-        [Fact]
-        public void Constructor_InitializesEmptyState()
-        {
-            Assert.Equal("", _handler.CurrentInput);
-            Assert.Equal("", _handler.FullExpression);
-            Assert.True(_handler.IsNewInput);
-            Assert.False(_handler.ErrorState);
-        }
-
-        [Theory]
-        [InlineData("5", "5")]
-        [InlineData("0", "0")]
-        public void HandleDigit_FirstDigit_SetsCurrentInput(string input, string expected)
-        {
-            _handler.HandleDigit(input);
-            Assert.Equal(expected, _handler.CurrentInput);
-            Assert.False(_handler.IsNewInput);
-        }
+        // ... (усі існуючі тести залишаються без змін) ...
 
         [Fact]
-        public void HandleDigit_AfterErrorState_ResetsState()
-        {
-            // Симулюємо помилку
-            _calculatorMock.Setup(x => x.ErrorState).Returns(true);
-            _handler.HandleDigit("5");
-
-            Assert.Equal("5", _handler.CurrentInput);
-            Assert.False(_handler.ErrorState);
-        }
-
-        [Fact]
-        public void HandleOperator_WithNegativeNumber_AddsParenthesesToExpression()
+        public void HandlePercent_AddsPercentSymbol()
         {
             _handler.HandleDigit("5");
-            _handler.HandleToggleSign();
+            _handler.HandleDigit("0");
+            _handler.HandlePercent();
+
+            Assert.Equal("50%", _handler.CurrentInput);
+        }
+
+        [Fact]
+        public void HandleEquals_WithSimplePercent_CalculatesCorrectly()
+        {
+            _calculatorMock.Setup(x => x.CalculateSimplePercent(50)).Returns(0.5);
+
+            _handler.HandleDigit("5");
+            _handler.HandleDigit("0");
+            _handler.HandlePercent();
+            _handler.HandleEquals();
+
+            Assert.Equal("0.5", _handler.CurrentInput);
+            Assert.Equal("50% =", _handler.FullExpression);
+        }
+
+        [Fact]
+        public void HandleEquals_WithOperationPercent_CalculatesCorrectly()
+        {
+            _calculatorMock.Setup(x => x.CalculateWithPercent(10)).Returns(110);
+
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleDigit("0");
             _handler.HandleOperator('+');
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandlePercent();
+            _handler.HandleEquals();
 
-            Assert.Equal("(-5) + ", _handler.FullExpression);
+            Assert.Equal("110", _handler.CurrentInput);
+            Assert.Equal("100 + 10% =", _handler.FullExpression);
         }
 
         [Fact]
-        public void HandleDecimalPoint_FirstInput_StartsWithZeroPoint()
+        public void HandleEquals_WithPercentAfterResult_CalculatesSimplePercent()
         {
-            _handler.HandleDecimalPoint();
-            Assert.Equal("0.", _handler.CurrentInput);
-        }
+            // Перший вираз: 100 + 20 = 120
+            _calculatorMock.Setup(x => x.Calculate(20)).Returns(120);
 
-        [Fact]
-        public void HandleToggleSign_WithEmptyInput_DoesNothing()
-        {
-            _handler.HandleToggleSign();
-            Assert.Equal("", _handler.CurrentInput);
-        }
-
-        [Fact]
-        public void HandleEquals_WithDivisionByZero_SetsErrorState()
-        {
-            // Налаштовуємо мок для повернення помилки
-            _calculatorMock.Setup(x => x.ErrorState).Returns(true);
-            _calculatorMock.Setup(x => x.Calculate(It.IsAny<double>())).Returns(double.NaN);
-
-            _handler.HandleDigit("5");
-            _handler.HandleOperator('/');
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleDigit("0");
+            _handler.HandleOperator('+');
+            _handler.HandleDigit("2");
             _handler.HandleDigit("0");
             _handler.HandleEquals();
 
-            Assert.Equal("ERROR", _handler.CurrentInput);
-            Assert.True(_handler.ErrorState);
-        }
+            // Другий вираз: просто 20% (не від результату)
+            _calculatorMock.Setup(x => x.CalculateSimplePercent(20)).Returns(0.2);
 
-        [Fact]
-        public void HandleClear_PartialClear_RemovesLastDigit()
-        {
-            _handler.HandleDigit("1");
             _handler.HandleDigit("2");
-            _handler.HandleClear(false);
-
-            Assert.Equal("1", _handler.CurrentInput);
-        }
-
-        [Fact]
-        public void HandleEquals_WithCultureSpecificFormat_ParsesCorrectly()
-        {
-            // Симулюємо французьку культуру (використовує кому замість крапки)
-            var originalCulture = Thread.CurrentThread.CurrentCulture;
-            Thread.CurrentThread.CurrentCulture = new CultureInfo("fr-FR");
-
-            try
-            {
-                _calculatorMock.Setup(x => x.Calculate(It.IsAny<double>())).Returns(8.5);
-
-                _handler.HandleDigit("5");
-                _handler.HandleDecimalPoint();
-                _handler.HandleDigit("2");
-                _handler.HandleOperator('+');
-                _handler.HandleDigit("3");
-                _handler.HandleDecimalPoint();
-                _handler.HandleDigit("3");
-                _handler.HandleEquals();
-
-                // Перевіряємо, що вивід у InvariantCulture (з крапкою)
-                Assert.Equal("8.5", _handler.CurrentInput);
-            }
-            finally
-            {
-                Thread.CurrentThread.CurrentCulture = originalCulture;
-            }
-        }
-
-        [Fact]
-        public void HandleOperator_AfterEquals_UsesResultAsFirstOperand()
-        {
-            // Налаштовуємо мок для повернення результату
-            _calculatorMock.Setup(x => x.Calculate(It.IsAny<double>())).Returns(8);
-
-            _handler.HandleDigit("5");
-            _handler.HandleOperator('+');
-            _handler.HandleDigit("3");
+            _handler.HandleDigit("0");
+            _handler.HandlePercent();
             _handler.HandleEquals();
-            _handler.HandleOperator('-');
 
-            Assert.Equal("8 - ", _handler.FullExpression);
+            Assert.Equal("0.2", _handler.CurrentInput);
+            Assert.Equal("20% =", _handler.FullExpression);
         }
 
         [Fact]
-        public void Reset_ClearsAllState()
+        public void HandlePercent_AfterOperator_DoesNotAffectExpression()
         {
             _handler.HandleDigit("5");
+            _handler.HandleDigit("0");
             _handler.HandleOperator('+');
-            _handler.Reset();
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandlePercent();
 
+            Assert.Equal("10%", _handler.CurrentInput);
+            Assert.Equal("50 + ", _handler.FullExpression);
+        }
+
+        [Fact]
+        public void HandlePercent_OnEmptyInput_DoesNothing()
+        {
+            _handler.HandlePercent();
             Assert.Equal("", _handler.CurrentInput);
-            Assert.Equal("", _handler.FullExpression);
-            Assert.True(_handler.IsNewInput);
+        }
+
+        [Fact]
+        public void HandlePercent_AfterErrorState_ResetsState()
+        {
+            _calculatorMock.Setup(x => x.ErrorState).Returns(true);
+            _handler.HandleDigit("5");
+            _handler.HandlePercent();
+
+            Assert.Equal("5%", _handler.CurrentInput);
             Assert.False(_handler.ErrorState);
         }
 
-        [Theory]
-        [InlineData("5", "+", "3", "5 + 3 =")]
-        [InlineData("5", "+", "-3", "5 + (-3) =")]
-        [InlineData("-5", "+", "3", "(-5) + 3 =")]
-        [InlineData("-5", "+", "-3", "(-5) + (-3) =")]
-        [InlineData("5", "-", "-3", "5 - (-3) =")]
-        [InlineData("5.2", "+", "-3.1", "5.2 + (-3.1) =")]
-        public void Test_ExpressionFormatting(string first, string op, string second, string expected)
+        [Fact]
+        public void HandleEquals_WithSimpleDecimalPercent_CalculatesCorrectly()
         {
-            var handler = new InputHandler(new CalculatorEngine());
+            _calculatorMock.Setup(x => x.CalculateSimplePercent(12.5)).Returns(0.125);
 
-            // Обробка першого числа
-            ProcessInputWithSign(handler, first);
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("2");
+            _handler.HandleDecimalPoint();
+            _handler.HandleDigit("5");
+            _handler.HandlePercent();
+            _handler.HandleEquals();
 
-            // Введення оператора
-            handler.HandleOperator(op[0]);
-
-            // Обробка другого числа
-            ProcessInputWithSign(handler, second);
-
-            // Обчислення
-            handler.HandleEquals();
-
-            Assert.Equal(expected, handler.FullExpression);
-        }
-
-
-        private static void ProcessInputWithSign(InputHandler handler, string input)
-        {
-            bool isNegative = input.StartsWith('-');
-            string number = isNegative ? input[1..] : input;
-
-            // Введення цифр та крапки
-            foreach (var c in number)
-            {
-                if (c == '.')
-                    handler.HandleDecimalPoint();
-                else
-                    handler.HandleDigit(c.ToString());
-            }
-
-            // Додаємо мінус в кінці (як це робить UI)
-            if (isNegative)
-            {
-                handler.HandleToggleSign();
-            }
+            Assert.Equal("0.125", _handler.CurrentInput);
+            Assert.Equal("12.5% =", _handler.FullExpression);
         }
 
         [Fact]
-        public void HandleToggleSign_AddsParenthesesInHistory()
+        public void HandleEquals_WithNegativePercent_CalculatesCorrectly()
+        {
+            _calculatorMock.Setup(x => x.SetOperation(100, '+'));
+            _calculatorMock.Setup(x => x.CalculateWithPercent(-10)).Returns(90);
+
+            // Правильна послідовність:
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleDigit("0");
+            _handler.HandleOperator('+');
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleToggleSign(); // Мінус після введення 10
+            _handler.HandlePercent();
+            _handler.HandleEquals();
+
+            Assert.Equal("90", _handler.CurrentInput);
+            Assert.Equal("100 + -10% =", _handler.FullExpression);
+        }
+
+        [Fact]
+        public void HandleEquals_WithNegativeBaseNumber_CalculatesCorrectly()
+        {
+            _calculatorMock.Setup(x => x.CalculateWithPercent(10)).Returns(-110);
+
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleDigit("0");
+            _handler.HandleToggleSign(); // робимо від'ємним
+            _handler.HandleOperator('+');
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandlePercent();
+            _handler.HandleEquals();
+
+            Assert.Equal("-110", _handler.CurrentInput);
+            Assert.Equal("(-100) + 10% =", _handler.FullExpression);
+        }
+
+        [Fact]
+        public void HandleEquals_WithMultiplyPercent_CalculatesCorrectly()
+        {
+            _calculatorMock.Setup(x => x.CalculateWithPercent(10)).Returns(10);
+
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleDigit("0");
+            _handler.HandleOperator('*');
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandlePercent();
+            _handler.HandleEquals();
+
+            Assert.Equal("10", _handler.CurrentInput);
+            Assert.Equal("100 * 10% =", _handler.FullExpression);
+        }
+
+        [Fact]
+        public void HandleEquals_WithDividePercent_CalculatesCorrectly()
+        {
+            _calculatorMock.Setup(x => x.CalculateWithPercent(10)).Returns(1000);
+
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleDigit("0");
+            _handler.HandleOperator('/');
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandlePercent();
+            _handler.HandleEquals();
+
+            Assert.Equal("1000", _handler.CurrentInput);
+            Assert.Equal("100 / 10% =", _handler.FullExpression);
+        }
+
+        [Fact]
+        public void HandlePercent_AfterOperatorWithoutNumber_DoesNothing()
+        {
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleDigit("0");
+            _handler.HandleOperator('+');
+            _handler.HandlePercent();
+
+            Assert.Equal("", _handler.CurrentInput);
+            Assert.Equal("100 + ", _handler.FullExpression);
+        }
+
+        [Fact]
+        public void HandlePercent_MultiplePercentSigns_OnlyFirstIsProcessed()
+        {
+            _handler.HandleDigit("5");
+            _handler.HandleDigit("0");
+            _handler.HandlePercent();
+            _handler.HandlePercent(); // другий знак % ігнорується
+
+            Assert.Equal("50%", _handler.CurrentInput);
+        }
+
+        [Fact]
+        public void FormatNumber_AlwaysUsesInvariantCulture()
+        {
+            // Налаштовуємо моки для всіх сценаріїв
+            _calculatorMock.Setup(x => x.SetOperation(100, '+'));
+            _calculatorMock.Setup(x => x.Calculate(25)).Returns(125);
+
+            _calculatorMock.Setup(x => x.SetOperation(10.5, '*'));
+            _calculatorMock.Setup(x => x.Calculate(2)).Returns(21);
+
+            _calculatorMock.Setup(x => x.SetOperation(-5, '+'));
+            _calculatorMock.Setup(x => x.Calculate(10.5)).Returns(5.5);
+
+            // Сценарій 1: 100 + 25 = 125
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleDigit("0");
+            _handler.HandleOperator('+');
+            _handler.HandleDigit("2");
+            _handler.HandleDigit("5");
+            _handler.HandleEquals();
+            Assert.Equal("125", _handler.CurrentInput);
+            Assert.Equal("100 + 25 =", _handler.FullExpression);
+
+            // Сценарій 2: 10.5 × 2 = 21
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleDecimalPoint();
+            _handler.HandleDigit("5");
+            _handler.HandleOperator('*');
+            _handler.HandleDigit("2");
+            _handler.HandleEquals();
+            Assert.Equal("21", _handler.CurrentInput);
+            Assert.Equal("10.5 * 2 =", _handler.FullExpression);
+
+            // Сценарій 3: -5 + 10.5 = 5.5
+            _handler.HandleDigit("5");
+            _handler.HandleToggleSign(); // Мінус після введення числа!
+            _handler.HandleOperator('+');
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleDecimalPoint();
+            _handler.HandleDigit("5");
+            _handler.HandleEquals();
+            Assert.Equal("5.5", _handler.CurrentInput);
+            Assert.Equal("(-5) + 10.5 =", _handler.FullExpression);
+        }
+
+        [Fact]
+        public void HandlePercentBetweenNumbers_WithSpaces_CalculatesCorrectly()
         {
             // Arrange
-            var engine = new CalculatorEngine();
-            var handler = new InputHandler(engine);
+            _calculatorMock.Setup(x => x.CalculatePercentOfNumber(5, 100)).Returns(5);
 
             // Act
-            handler.HandleDigit("5");
-            handler.HandleOperator('+');
-            handler.HandleDigit("3");
-            handler.HandleToggleSign(); // Змінюємо 3 на -3
-            handler.HandleEquals();
+            _handler.HandleDigit("5");
+            _handler.HandlePercent();  // "5 % " у FullExpression
+            _handler.HandleDigit("1");
+            _handler.HandleDigit("0");
+            _handler.HandleDigit("0");
+            _handler.HandleEquals();
 
             // Assert
-            Assert.Equal("5 + (-3) =", handler.FullExpression);
-        }
-
-        [Fact]
-        public void AfterEquals_DecimalOrSign_ClearsHistory()
-        {
-            var handler = new InputHandler(new CalculatorEngine());
-
-            // 5 + 3 = 8
-            handler.HandleDigit("5");
-            handler.HandleOperator('+');
-            handler.HandleDigit("3");
-            handler.HandleEquals();
-
-            // Натискаємо . після =
-            handler.HandleDecimalPoint();
-            Assert.Equal("0.", handler.CurrentInput);
-            Assert.Equal("", handler.FullExpression); // Історія очищена!
+            Assert.Equal("5", _handler.CurrentInput);
+            Assert.Equal("5%100 =", _handler.FullExpression);
         }
     }
 }

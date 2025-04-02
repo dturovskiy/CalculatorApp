@@ -51,7 +51,8 @@ namespace CalculatorApp
 
         private void OnPercentClicked(object sender, EventArgs e)
         {
-            throw new NotImplementedException();
+            _inputHandler.HandlePercent();
+            UpdateDisplay();
         }
 
         private void OnEqualsClicked(object sender, EventArgs e)
