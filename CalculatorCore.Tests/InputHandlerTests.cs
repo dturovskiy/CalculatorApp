@@ -6,12 +6,14 @@ namespace CalculatorCore.Tests
     public class InputHandlerTests
     {
         private readonly Mock<ICalculatorEngine> _calculatorMock;
+        private readonly Mock<ExpressionFormatter> _formatterMock;
         private readonly InputHandler _handler;
 
         public InputHandlerTests()
         {
             _calculatorMock = new Mock<ICalculatorEngine>();
-            _handler = new InputHandler(_calculatorMock.Object);
+            _formatterMock = new Mock<ExpressionFormatter>();
+            _handler = new InputHandler(_calculatorMock.Object, _formatterMock.Object);
         }
 
         // ... (усі існуючі тести залишаються без змін) ...
@@ -150,7 +152,7 @@ namespace CalculatorCore.Tests
             _handler.HandleEquals();
 
             Assert.Equal("90", _handler.CurrentInput);
-            Assert.Equal("100 + -10% =", _handler.FullExpression);
+            Assert.Equal("100 + (-10%) =", _handler.FullExpression);
         }
 
         [Fact]

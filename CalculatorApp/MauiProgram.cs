@@ -17,10 +17,11 @@ namespace CalculatorApp
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
-            // Add your services here
+            // Реєстрація сервісів
             builder.Services
+                .AddSingleton<ExpressionFormatter>() // Спочатку залежність
                 .AddSingleton<ICalculatorEngine, CalculatorEngine>()
-                .AddSingleton<IInputHandler, InputHandler>();
+                .AddSingleton<IInputHandler, InputHandler>(); // Використовує ExpressionFormatter
 
 #if DEBUG
             builder.Logging.AddDebug();
