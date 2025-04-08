@@ -13,89 +13,55 @@ namespace CalculatorCore
 
         private readonly ICalculatorEngine _calculator = calculator;
 
-        public string CurrentInput => _currentInput;
+        public string CurrentInput => _errorState ? "ERROR" : _currentInput;
         public string FullExpression => _fullExpression;
         public bool IsNewInput => _isNewInput;
         public bool ErrorState => _errorState;
 
         public void HandleDigit(string digit)
         {
-            if (_errorState)
-            {
-                Reset();
-                return;
-            }
-
-            if (digit.Length != 1 || !char.IsDigit(digit[0])) return;
+            if (ValidateDigitInput(digit)) return;
 
             if (_isNewInput)
             {
-                // Завжди починаємо нове введення, незалежно від _fullExpression
-                _fullExpression = _fullExpression.Contains('=') ? "" : _fullExpression;
-                _currentInput = digit == "0" ? "0" : digit;
-                _isNewInput = false;
-                _hasDecimalPoint = false;
+                StartNewInput(digit);
             }
             else
             {
-                if (_currentInput == "0" && digit != ".")
-                {
-                    return;
-                }
-                _currentInput += digit;
+                AppendToCurrentInput(digit);
             }
         }
 
         public void HandleOperator(char op)
         {
-            if (_errorState)
-            {
-                Reset();
-                return;
-            }
+            if (ValidateOperatorInput(op)) return;
 
-            // Якщо вже є вираз з % (A% B), ігноруємо оператор
-            if (_fullExpression.Contains('%')) return;
-
-            if (string.IsNullOrEmpty(_currentInput) && _fullExpression.Contains('='))
+            if (ShouldUseResultFromPreviousCalculation())
             {
-                _currentInput = _fullExpression.Split('=')[1].Trim();
-                _fullExpression = "";
+                UseResultFromPreviousCalculation();
             }
 
             if (!string.IsNullOrEmpty(_currentInput))
             {
-                // Форматуємо число для історії
-                string displayNumber = FormatForHistory(_currentInput);
-                _fullExpression = $"{displayNumber} {op} ";
-                _isNewInput = true;
-                _currentInput = "";
+                UpdateExpressionWithOperator(op);
             }
-            else if (!string.IsNullOrEmpty(_fullExpression) && !_fullExpression.Contains('='))
+            else if (CanChangeOperator())
             {
-                // Зміна оператора
-                _fullExpression = _fullExpression[..^2] + op + " ";
+                ChangeOperator(op);
             }
         }
 
         public void HandleDecimalPoint()
         {
-            if (_errorState)
-            {
-                return;
-            }
+            if (_errorState) return;
 
             if (_isNewInput)
             {
-                _currentInput = "0.";
-                _fullExpression = "";
-                _isNewInput = false;
-                _hasDecimalPoint = true;
+                StartNewDecimalInput();
             }
             else if (!_hasDecimalPoint)
             {
-                _currentInput += ".";
-                _hasDecimalPoint = true;
+                AddDecimalPointToInput();
             }
         }
 
@@ -110,7 +76,7 @@ namespace CalculatorCore
 
             _currentInput = _currentInput.StartsWith('-')
                 ? _currentInput[1..]
-                : $"-{_currentInput}";
+                : $"(-{_currentInput})";
         }
 
         public void HandleClear(bool fullClear)
@@ -121,13 +87,7 @@ namespace CalculatorCore
             }
             else
             {
-                _currentInput = _currentInput[..^1];
-
-                if (_currentInput == "0" || string.IsNullOrEmpty(_currentInput))
-                {
-                    _isNewInput = true;
-                    _currentInput = "";
-                }
+                Backspace();
             }
         }
 
@@ -147,32 +107,139 @@ namespace CalculatorCore
 
             try
             {
-                ExpressionType type = DetermineExpressionType();
-
-                switch (type)
-                {
-                    case ExpressionType.PercentOperation:
-                    case ExpressionType.PercentOfNumber:
-                    case ExpressionType.StandalonePercent:
-                        ProcessPercentCalculation();
-                        break;
-                    case ExpressionType.RegularOperation:
-                        ProcessRegularCalculation();
-                        break;
-                    default:
-                        _errorState = true;
-                        _currentInput = "ERROR";
-                        break;
-                }
+                ProcessCalculation();
             }
             catch
             {
-                _errorState = true;
-                _currentInput = "ERROR";
+                SetErrorState();
             }
             finally
             {
                 _isNewInput = true;
+            }
+        }
+
+        public void Reset()
+        {
+            _currentInput = "";
+            _fullExpression = "";
+            _isNewInput = true;
+            _hasDecimalPoint = false;
+            _errorState = false;
+        }
+
+        #region Private Helper Methods
+
+        private bool ValidateDigitInput(string digit)
+        {
+            if (_errorState)
+            {
+                Reset();
+                return true;
+            }
+
+            return digit.Length != 1 || !char.IsDigit(digit[0]);
+        }
+
+        private void StartNewInput(string digit)
+        {
+            _fullExpression = _fullExpression.Contains('=') ? "" : _fullExpression;
+            _currentInput = digit == "0" ? "0" : digit;
+            _isNewInput = false;
+            _hasDecimalPoint = false;
+        }
+
+        private void AppendToCurrentInput(string digit)
+        {
+            if (_currentInput == "0" && digit != ".")
+            {
+                return;
+            }
+            _currentInput += digit;
+        }
+
+        private bool ValidateOperatorInput(char op)
+        {
+            if (_errorState)
+            {
+                Reset();
+                return true;
+            }
+
+            return _fullExpression.Contains('%');
+        }
+
+        private bool ShouldUseResultFromPreviousCalculation()
+        {
+            return string.IsNullOrEmpty(_currentInput) && _fullExpression.Contains('=');
+        }
+
+        private void UseResultFromPreviousCalculation()
+        {
+            _currentInput = _fullExpression.Split('=')[1].Trim();
+            _fullExpression = "";
+        }
+
+        private void UpdateExpressionWithOperator(char op)
+        {
+            string displayNumber = FormatForHistory(_currentInput);
+            _fullExpression = $"{displayNumber} {op} ";
+            _isNewInput = true;
+            _currentInput = "";
+        }
+
+        private bool CanChangeOperator()
+        {
+            return !string.IsNullOrEmpty(_fullExpression) && !_fullExpression.Contains('=');
+        }
+
+        private void ChangeOperator(char op)
+        {
+            _fullExpression = _fullExpression[..^2] + op + " ";
+        }
+
+        private void StartNewDecimalInput()
+        {
+            _currentInput = "0.";
+            _fullExpression = "";
+            _isNewInput = false;
+            _hasDecimalPoint = true;
+        }
+
+        private void AddDecimalPointToInput()
+        {
+            _currentInput += ".";
+            _hasDecimalPoint = true;
+        }
+
+        private void Backspace()
+        {
+            _currentInput = _currentInput[..^1];
+
+            if (_currentInput == "0" || string.IsNullOrEmpty(_currentInput))
+            {
+                _isNewInput = true;
+                _currentInput = "";
+            }
+        }
+
+        private void ProcessCalculation()
+        {
+            ExpressionType type = DetermineExpressionType();
+
+            switch (type)
+            {
+                case ExpressionType.PercentOperation:
+                case ExpressionType.PercentOfNumber:
+                case ExpressionType.StandalonePercent:
+                    ProcessPercentCalculation();
+                    break;
+                case ExpressionType.RegularOperation:
+                    ProcessRegularCalculation();
+                    break;
+                default:
+                    SetErrorState();
+                    break;
             }
         }
 
@@ -181,62 +248,70 @@ namespace CalculatorCore
             switch (DetermineExpressionType())
             {
                 case ExpressionType.StandalonePercent:
-                    double simplePercent = ParseNumber(_currentInput.TrimEnd('%'));
-                    _currentInput = FormatNumber(_calculator.CalculateSimplePercent(simplePercent));
-                    _fullExpression = $"{FormatNumber(simplePercent)}% =";
+                    ProcessStandalonePercent();
                     break;
-
                 case ExpressionType.PercentOperation:
-                    var opParts = _fullExpression.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (opParts.Length < 2)
-                    {
-                        _errorState = true;
-                        _currentInput = "ERROR";
-                        break;
-                    }
-
-                    double baseNum = ParseNumber(opParts[0]);
-                    char operation = opParts[1][0];
-                    double percent = ParseNumber(_currentInput.TrimEnd('%'));
-
-                    _calculator.SetOperation(baseNum, operation); // Фікс: передаємо baseNum!
-                    double result = _calculator.CalculateWithPercent(percent);
-
-                    _currentInput = FormatNumber(result);
-                    _fullExpression = $"{FormatForHistory(FormatNumber(baseNum))} {operation} {percent}% =";
+                    ProcessPercentOperation();
                     break;
-
                 case ExpressionType.PercentOfNumber:
-                    // Розділяємо введений рядок на частини (A% B)
-                    string[] parts = _currentInput.Split(new[] { '%' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length != 2)
-                    {
-                        _errorState = true;
-                        _currentInput = "ERROR";
-                        break;
-                    }
-
-                    string percentPart = parts[0].Trim();
-                    string numberPart = parts[1].Trim();
-
-                    if (!double.TryParse(percentPart, NumberStyles.Any, CultureInfo.InvariantCulture, out double percentOf) ||
-                        !double.TryParse(numberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out double number))
-                    {
-                        _errorState = true;
-                        _currentInput = "ERROR";
-                        break;
-                    }
-
-                    double calculated = _calculator.CalculatePercentOfNumber(percentOf, number);
-                    _currentInput = FormatNumber(calculated);
-                    _fullExpression = $"{percentPart}%{FormatNumber(number)} =";
+                    ProcessPercentOfNumber();
                     break;
-
                 default:
-                    _errorState = true;
-                    _currentInput = "ERROR";
+                    SetErrorState();
                     break;
             }
+        }
+
+        private void ProcessStandalonePercent()
+        {
+            double simplePercent = ParseNumber(_currentInput.TrimEnd('%'));
+            _currentInput = FormatNumber(_calculator.CalculateSimplePercent(simplePercent));
+            _fullExpression = $"{FormatNumber(simplePercent)}% =";
+        }
+
+
+        private void ProcessPercentOperation()
+        {
+            var opParts = _fullExpression.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (opParts.Length < 2)
+            {
+                SetErrorState();
+                return;
+            }
+
+            double baseNum = ParseNumber(opParts[0]);
+            char operation = opParts[1][0];
+            double percent = ParseNumber(_currentInput.TrimEnd('%'));
+
+            _calculator.SetOperation(baseNum, operation);
+            double result = _calculator.CalculateWithPercent(percent);
+
+            _currentInput = FormatNumber(result);
+            _fullExpression = $"{FormatForHistory(FormatNumber(baseNum))} {operation} {percent}% =";
+        }
+
+        private void ProcessPercentOfNumber()
+        {
+            string[] parts = _currentInput.Split(new[] { '%' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2)
+            {
+                SetErrorState();
+                return;
+            }
+
+            string percentPart = parts[0].Trim();
+            string numberPart = parts[1].Trim();
+
+            if (!double.TryParse(percentPart, NumberStyles.Any, CultureInfo.InvariantCulture, out double percentOf) ||
+                !double.TryParse(numberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out double number))
+            {
+                SetErrorState();
+                return;
+            }
+
+            double calculated = _calculator.CalculatePercentOfNumber(percentOf, number);
+            _currentInput = FormatNumber(calculated);
+            _fullExpression = $"{percentPart}%{FormatNumber(number)} =";
         }
 
         private void ProcessRegularCalculation()
@@ -253,14 +328,18 @@ namespace CalculatorCore
 
             if (_calculator.ErrorState)
             {
-                _errorState = true;
-                _currentInput = "ERROR";
+                SetErrorState();
             }
             else
             {
                 _currentInput = FormatNumber(result);
                 _fullExpression = $"{FormatForHistory(parts[0])} {op} {FormatSecondNumber(secondNumber)} =";
             }
+        }
+
+        private void SetErrorState()
+        {
+            _errorState = true;
         }
 
 
@@ -271,14 +350,7 @@ namespace CalculatorCore
                  : FormatNumber(number); // І тут
         }
 
-        public void Reset()
-        {
-            _currentInput = "";
-            _fullExpression = "";
-            _isNewInput = true;
-            _hasDecimalPoint = false;
-            _errorState = false;
-        }
+
 
         // Допоміжні методи
         private static string FormatForHistory(string numberStr)
@@ -324,7 +396,6 @@ namespace CalculatorCore
             bool currentEndsWithPercent = _currentInput.EndsWith("%");
             bool currentHasPercent = _currentInput.Contains("%");
             bool historyHasPercent = _fullExpression.Contains("%");
-            bool historyEndsWithPercent = _fullExpression.TrimEnd().EndsWith("%");
 
             // 1. A% (Standalone)
             if (currentEndsWithPercent && !hasOperator && !historyHasPercent)
@@ -345,4 +416,6 @@ namespace CalculatorCore
             return ExpressionType.Unknown;
         }
     }
+
+    #endregion
 }
