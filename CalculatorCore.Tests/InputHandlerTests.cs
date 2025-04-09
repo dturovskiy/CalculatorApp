@@ -300,5 +300,63 @@ namespace CalculatorCore.Tests
             Assert.Equal("5", _handler.CurrentInput);
             Assert.Equal("5%100 =", _handler.FullExpression);
         }
+
+        [Fact]
+        public void HandleEquals_OnEmptyInput_DoesNothing()
+        {
+            _handler.HandleEquals();
+
+            Assert.Equal("", _handler.CurrentInput);
+            Assert.Equal("", _handler.FullExpression);
+        }
+
+        [Fact]
+        public void HandleEquals_WithSingleNumber_ShowsSameNumber()
+        {
+            _handler.HandleDigit("5");
+            _handler.HandleEquals();
+
+            Assert.Equal("5", _handler.CurrentInput);
+            Assert.Equal("5 =", _handler.FullExpression);
+        }
+
+        [Fact]
+        public void HandleToggleSign_Twice_RevertsToOriginal()
+        {
+            _handler.HandleDigit("5");
+            _handler.HandleToggleSign(); // (-5)
+            _handler.HandleToggleSign(); // 5
+
+            Assert.Equal("5", _handler.CurrentInput);
+        }
+
+        [Fact]
+        public void HandleEquals_WithNegativeBeforePercent_CalculatesCorrectly()
+        {
+            _calculatorMock.Setup(x => x.CalculateSimplePercent(-3)).Returns(-0.03);
+
+            _handler.HandleDigit("3");
+            _handler.HandleToggleSign(); // змінюємо знак ДО %
+            _handler.HandlePercent();
+            _handler.HandleEquals();
+
+            Assert.Equal("-0.03", _handler.CurrentInput);
+            Assert.Equal("(-3%) =", _handler.FullExpression);
+        }
+
+        [Fact]
+        public void HandleEquals_WithNegativeAfterPercent_CalculatesCorrectly()
+        {
+            _calculatorMock.Setup(x => x.CalculateSimplePercent(-3)).Returns(-0.03);
+
+            _handler.HandleDigit("3");
+            _handler.HandlePercent();
+            _handler.HandleToggleSign(); // змінюємо знак ПІСЛЯ %
+            _handler.HandleEquals();
+
+            Assert.Equal("-0.03", _handler.CurrentInput);
+            Assert.Equal("(-3%) =", _handler.FullExpression);
+        }
+
     }
 }

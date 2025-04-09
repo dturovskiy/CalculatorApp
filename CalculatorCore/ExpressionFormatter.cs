@@ -31,7 +31,7 @@ namespace CalculatorCore
                 return numberStr;
 
             // Спеціальна обробка для відсотків
-            if (numberStr.EndsWith("%"))
+            if (numberStr.EndsWith('%'))
             {
                 // Для відсотків у дужках: (-5%) → залишаємо як є
                 if (numberStr.StartsWith("(-") && numberStr.EndsWith(")%"))
@@ -53,7 +53,7 @@ namespace CalculatorCore
             string formattedLeft = FormatForHistory(leftPart);
             string formattedRight = !string.IsNullOrEmpty(rightPart) ? FormatForHistory(rightPart) : "";
 
-            if (rightPart.EndsWith("%"))
+            if (rightPart.EndsWith('%'))
             {
                 formattedRight = rightPart; // Не змінюємо відсотки
             }
@@ -76,7 +76,7 @@ namespace CalculatorCore
             // 2. Збереження оригінального формату (якщо передано)
             if (!string.IsNullOrEmpty(originalInput))
             {
-                bool wasParenthesized = originalInput.StartsWith("(") && originalInput.EndsWith(")");
+                bool wasParenthesized = originalInput.StartsWith('(') && originalInput.EndsWith(')');
                 if (wasParenthesized) return $"({formatted})";
             }
 
@@ -87,13 +87,13 @@ namespace CalculatorCore
         public bool IsPercentWithParentheses(string input)
         {
             return input.Contains(")%")
-                   && input.StartsWith("(")
+                   && input.StartsWith('(')
                    && input.IndexOf(')') == input.Length - 2;
         }
 
         public bool IsNegativePercent(string input)
         {
-            return input.StartsWith("-") && input.EndsWith("%");
+            return input.StartsWith('-') && input.EndsWith('%');
         }
 
         public bool IsParenthesizedNegativePercent(string input)
@@ -106,7 +106,7 @@ namespace CalculatorCore
             if (IsParenthesizedNegativePercent(input))
                 return input.TrimStart('(').TrimEnd(')', '%');
 
-            if (IsNegativePercent(input) || input.EndsWith("%"))
+            if (IsNegativePercent(input) || input.EndsWith('%'))
                 return input.TrimEnd('%');
 
             return input;
@@ -124,28 +124,37 @@ namespace CalculatorCore
 
         public string ToggleSign(string input)
         {
-            if (string.IsNullOrEmpty(input)) return input;
+            if (string.IsNullOrEmpty(input))
+                return input;
 
-            if (IsNegativePercent(input))
-                return input.Substring(1);
+            // Якщо введення "0" або "(-0)", повертаємо "0"
+            if (input == "0" || input == "(-0)")
+                return "0";
 
-            if (IsParenthesizedNegativePercent(input))
-                return input.TrimStart('(').TrimEnd(')', '%') + "%";
+            bool isPercent = input.EndsWith('%');
 
-            if (input.EndsWith("%"))
-                return $"-{input}";
+            // Випадок: -5% → 5%
+            if (input.StartsWith('-') && isPercent && !input.StartsWith("(-"))
+                return input[1..]; // знімає лише перший мінус
 
-            if (IsPercentWithParentheses(input))  // Обробляє (-5%) і (-5)%
+            // Випадок: (-5%) → 5%
+            if (input.StartsWith("(-") && isPercent)
+                return input[2..^2] + "%"; // знімає "(-" і ")" (але додає % назад)
+
+            // Випадок: 5% → (-5)%
+            if (isPercent)
             {
-                string number = input.TrimStart('(').TrimEnd(')', '%');
-                return number.StartsWith("-")
-                    ? $"{number.Substring(1)}%"
-                    : $"(-{number})%";
+                string number = input[..^1]; // без '%'
+                return $"(-{number})%";
             }
 
-            return IsNegativeNumber(input)
-                ? input.TrimStart('-').TrimStart('(').TrimEnd(')')
-                : $"(-{input})";
+            // Випадок: (-5) → 5
+            if (input.StartsWith("(-") && input.EndsWith(")"))
+                return input[2..^1]; // знімає дужки
+
+            // Випадок: 5 → (-5)
+            return $"(-{input})";
         }
+
     }
 }

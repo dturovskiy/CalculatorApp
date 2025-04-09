@@ -6,6 +6,7 @@
         PercentOperation,   // A + B%
         PercentOfNumber,    // A % B
         StandalonePercent,  // A%
-        Unknown
+        SingleNumber,       // A
+        Unknown,
     }
 }

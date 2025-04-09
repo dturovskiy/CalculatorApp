@@ -243,10 +243,22 @@ namespace CalculatorCore
                 case ExpressionType.RegularOperation:
                     ProcessRegularCalculation();
                     break;
+                case ExpressionType.SingleNumber: // Нова обробка
+                    ProcessSingleNumber();
+                    break;
                 default:
                     SetErrorState();
                     break;
             }
+        }
+
+        private void ProcessSingleNumber()
+        {
+            _fullExpression = _formatter.FormatExpression(
+                leftPart: _currentInput,
+                operation: "",
+                rightPart: ""
+            );
         }
 
         private void ProcessPercentCalculation()
@@ -288,7 +300,7 @@ namespace CalculatorCore
 
         private void ProcessPercentOperation()
         {
-            var opParts = _fullExpression.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var opParts = _fullExpression.Split([' '], StringSplitOptions.RemoveEmptyEntries);
             if (opParts.Length < 2)
             {
                 SetErrorState();
@@ -319,7 +331,7 @@ namespace CalculatorCore
 
         private void ProcessPercentOfNumber()
         {
-            string[] parts = _currentInput.Split(new[] { '%' }, StringSplitOptions.RemoveEmptyEntries);
+            string[] parts = _currentInput.Split(['%'], StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length != 2)
             {
                 SetErrorState();
@@ -376,15 +388,6 @@ namespace CalculatorCore
             _errorState = true;
         }
 
-        private string FormatNumber(double number)
-        {
-            // Явна перевірка (якщо хочете додаткової безпеки)
-            if (_formatter == null)
-                throw new InvalidOperationException("Formatter not initialized");
-
-            return _formatter.FormatDisplay(number);
-        }
-
         private ExpressionType DetermineExpressionType()
         {
             bool hasOperator = _fullExpression.Contains(" + ") ||
@@ -392,9 +395,9 @@ namespace CalculatorCore
                               _fullExpression.Contains(" * ") ||
                               _fullExpression.Contains(" / ");
 
-            bool currentEndsWithPercent = _currentInput.EndsWith("%");
-            bool currentHasPercent = _currentInput.Contains("%");
-            bool historyHasPercent = _fullExpression.Contains("%");
+            bool currentEndsWithPercent = _currentInput.EndsWith('%');
+            bool currentHasPercent = _currentInput.Contains('%');
+            bool historyHasPercent = _fullExpression.Contains('%');
 
             // 1. A% (Standalone)
             if (currentEndsWithPercent && !hasOperator && !historyHasPercent)
@@ -411,6 +414,10 @@ namespace CalculatorCore
             // 4. Regular operation
             if (hasOperator)
                 return ExpressionType.RegularOperation;
+
+            // 5. Single number (new case)
+            if (!string.IsNullOrEmpty(_currentInput) && !hasOperator)
+                return ExpressionType.SingleNumber;
 
             return ExpressionType.Unknown;
         }
