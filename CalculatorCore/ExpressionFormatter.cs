@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics;
+using System.Globalization;
 
 namespace CalculatorCore
 {
@@ -7,7 +8,26 @@ namespace CalculatorCore
         // 1. Метод для форматування чисел (на вивід)
         public string FormatDisplay(double number)
         {
+            // Якщо число дуже велике або дуже мале, використовуємо наукову нотацію
+            if (Math.Abs(number) >= 1_000_000_000_000 || (Math.Abs(number) < 0.0001 && number != 0))
+            {
+                return number.ToString("0.##############E+0", CultureInfo.InvariantCulture);
+            }
+
+            // Для звичайних чисел використовуємо поточний формат
             return number.ToString("0.###############", CultureInfo.InvariantCulture);
+        }
+
+        public string FormatResultWithParentheses(double number)
+        {
+            string formattedNumber = FormatDisplay(number); // Спочатку форматуємо число
+
+            if (!formattedNumber.StartsWith("- ") && number < 0)
+            {
+                return $"({formattedNumber})"; // Додаємо дужки для від'ємних
+            }
+
+            return formattedNumber; // Без змін для додатних
         }
 
         // 2. Метод для парсингу чисел (з рядка)
@@ -17,7 +37,17 @@ namespace CalculatorCore
                 return 0;
 
             // Видаляємо дужки для від'ємних чисел
-            string cleanNumber = numberStr.Replace("(", "").Replace(")", "");
+            string cleanNumber = numberStr.Replace("(", "").Replace(")", "").Trim();
+
+            // Якщо рядок закінчується на оператор (наприклад, "10 +"), видаляємо його
+            if (cleanNumber.Length > 0 && "+-*/".Contains(cleanNumber[^1]))
+            {
+                cleanNumber = cleanNumber[..^1].Trim();
+            }
+
+            if (string.IsNullOrEmpty(cleanNumber))
+                return 0;
+
             return double.Parse(cleanNumber, CultureInfo.InvariantCulture);
         }
 
@@ -124,6 +154,8 @@ namespace CalculatorCore
 
         public string ToggleSign(string input)
         {
+            Debug.WriteLine($"Input: '{input}'");
+
             if (string.IsNullOrEmpty(input))
                 return input;
 

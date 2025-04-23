@@ -18,7 +18,7 @@
             input.HandleDigit("2");
             input.HandleEquals();
 
-            Assert.Equal("-11", input.CurrentInput);
+            Assert.Equal("(-11)", input.CurrentInput);
             Assert.Contains("(-5.5) * 2 =", input.FullExpression);
         }
     }

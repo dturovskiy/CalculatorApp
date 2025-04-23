@@ -1,21 +1,17 @@
 ﻿using CalculatorCore.Services;
 using Moq;
+using System.Text;
 
 namespace CalculatorCore.Tests
 {
-    /// <summary>
-    /// Базовий клас для всіх тестів калькулятора.
-    /// Містить спільну логіку ініціалізації та допоміжні методи.
-    /// </summary>
     public abstract class CalculatorTestBase : IDisposable
     {
-        // Спільні залежності для всіх тестів
         protected readonly Mock<ICalculatorEngine> CalculatorMock;
         protected readonly Mock<ExpressionFormatter> FormatterMock;
         protected readonly InputHandler InputHandler;
         protected readonly CalculatorEngine CalculatorEngine;
 
-        protected CalculatorTestBase(bool useRealEngine = false)
+        protected CalculatorTestBase(bool useRealEngine = true)
         {
             CalculatorMock = new Mock<ICalculatorEngine>();
             FormatterMock = new Mock<ExpressionFormatter>();
@@ -26,9 +22,6 @@ namespace CalculatorCore.Tests
                 : new InputHandler(CalculatorMock.Object, FormatterMock.Object);
         }
 
-        /// <summary>
-        /// Вводить послідовність цифр у калькулятор
-        /// </summary>
         protected void EnterDigits(string digits)
         {
             foreach (var c in digits)
@@ -39,30 +32,72 @@ namespace CalculatorCore.Tests
             }
         }
 
-        /// <summary>
-        /// Вводить математичний вираз (цифри + оператори)
-        /// </summary>
         protected void EnterExpression(string expression)
         {
-            foreach (var c in expression)
+            bool isNegative = false;
+            int startIndex = 0;
+
+            // Обробка випадку "(-100)"
+            if (expression.StartsWith("(-"))
             {
-                if (char.IsDigit(c))
-                    InputHandler.HandleDigit(c.ToString());
-                else if ("+-*/".Contains(c))
-                    InputHandler.HandleOperator(c);
-                else if (c == '.')
-                    InputHandler.HandleDecimalPoint();
-                else if (c == ' ')
+                isNegative = true;
+                startIndex = 2; // Пропускаємо "(-"
+            }
+            // Обробка звичайного від'ємного числа "-100"
+            else if (expression.StartsWith("-"))
+            {
+                isNegative = true;
+                startIndex = 1; // Пропускаємо "-"
+            }
+
+            // Вводимо число
+            StringBuilder currentNumber = new StringBuilder();
+            for (int i = startIndex; i < expression.Length; i++)
+            {
+                char c = expression[i];
+
+                if (char.IsDigit(c) || c == '.')
                 {
-                    // Явно обробляємо пробіли
-                    // Вони важливі для форматування виразу
+                    currentNumber.Append(c);
+                }
+                else if (c == ')')
+                {
+                    continue; // Пропускаємо закриваючу дужку
+                }
+                else
+                {
+                    // Якщо є число, яке треба ввести
+                    if (currentNumber.Length > 0)
+                    {
+                        EnterDigits(currentNumber.ToString());
+                        if (isNegative)
+                        {
+                            InputHandler.HandleToggleSign(); // Додаємо мінус після введення числа
+                            isNegative = false;
+                        }
+                        currentNumber.Clear();
+                    }
+
+                    // Обробка оператора
+                    if ("+-*/".Contains(c))
+                    {
+                        InputHandler.HandleOperator(c);
+                    }
+                }
+            }
+
+            // Вводимо останнє число (якщо залишилося)
+            if (currentNumber.Length > 0)
+            {
+                EnterDigits(currentNumber.ToString());
+                if (isNegative)
+                {
+                    InputHandler.HandleToggleSign();
                 }
             }
         }
 
-        /// <summary>
-        /// Налаштовує мок для операції з відсотками
-        /// </summary>
+
         protected void SetupPercentCalculation(double input, double result, char? op = null)
         {
             if (op.HasValue)
@@ -78,7 +113,6 @@ namespace CalculatorCore.Tests
 
         public virtual void Dispose()
         {
-            // Очищення ресурсів при необхідності
         }
     }
 }

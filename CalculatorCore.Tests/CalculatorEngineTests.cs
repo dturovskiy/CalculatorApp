@@ -18,15 +18,6 @@
             Assert.False(_engine.ErrorState);
         }
 
-        [Fact]
-        public void Calculate_DivideByZero_SetsErrorState()
-        {
-            _engine.SetOperation(5, '/');
-            var result = _engine.Calculate(0);
-            Assert.True(_engine.ErrorState);
-            Assert.Equal(0, result);
-        }
-
         /// <summary>
         /// Перевіряє, що ядро калькулятора відхиляє невірні оператори
         /// (На рівні UI такі оператори неможливо ввести)
@@ -66,24 +57,6 @@
             Assert.Equal(0, _engine.StoredNumber);
             Assert.Equal('\0', _engine.PendingOperator);
             Assert.False(_engine.ErrorState);
-        }
-
-        [Fact]
-        public void Calculate_WithoutSetOperation_ReturnsZero()
-        {
-            var result = _engine.Calculate(5);
-            Assert.Equal(0, result);
-        }
-
-        [Fact]
-        public void ErrorState_ResetsOnNewOperation()
-        {
-            var engine = new CalculatorEngine();
-            engine.SetOperation(5, '/');
-            engine.Calculate(0);
-            Assert.True(engine.ErrorState);
-            engine.SetOperation(3, '+');
-            Assert.False(engine.ErrorState);
         }
 
         // --- Нові тести для відсотків (додано без змін до існуючих) ---

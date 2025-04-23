@@ -26,24 +26,20 @@ namespace CalculatorCore
         public double Calculate(double secondNumber)
         {
             if (_errorState || !HasPendingOperation)
-                return 0;
+                throw new InvalidOperationException("No pending operation or in error state");
 
             try
             {
-                return _pendingOperator switch
+                double result = _pendingOperator switch
                 {
                     '+' => _storedNumber + secondNumber,
                     '-' => _storedNumber - secondNumber,
                     '*' => _storedNumber * secondNumber,
                     '/' => secondNumber != 0 ? _storedNumber / secondNumber
-                           : throw new DivideByZeroException(),
+                           : throw new DivideByZeroException("Division by zero is not allowed"),
                     _ => throw new InvalidOperationException("Unknown operator")
                 };
-            }
-            catch (Exception ex) when (ex is DivideByZeroException or InvalidOperationException)
-            {
-                _errorState = true;
-                return 0;
+                return result;
             }
             finally
             {

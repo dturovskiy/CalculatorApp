@@ -1,4 +1,5 @@
 ﻿using CalculatorCore.Services;
+using System.Globalization;
 
 namespace CalculatorCore
 {
@@ -34,21 +35,64 @@ namespace CalculatorCore
 
         public void HandleOperator(char op)
         {
-            if (ValidateOperatorInput(op)) return;
+            if (ValidateOperatorInput(op)) return; // Додаємо перевірку на початку
 
-            if (ShouldUseResultFromPreviousCalculation())
+            // Решта коду залишається без змін
+            if (_fullExpression.Contains('='))
             {
-                UseResultFromPreviousCalculation();
+                HandleOperatorAfterEquals(op);
+                return;
             }
+            HandleRegularOperator(op);
+        }
 
+        private void HandleOperatorAfterEquals(char op)
+        {
+            // 1. Витягуємо та валідуємо результат
+            string result = _currentInput;
+            if (string.IsNullOrEmpty(result)) return;
+
+            // 2. Форматуємо для історії (з урахуванням дужок)
+            string formattedResult = _formatter.FormatForHistory(result);
+
+            // 3. Створюємо новий вираз
+            _fullExpression = $"{formattedResult} {op} ";
+
+            _currentInput = "";
+            _isNewInput = true;
+            _hasDecimalPoint = false;
+        }
+
+        private void HandleRegularOperator(char op)
+        {
+            // 1. Перевірка на відсотки
+            if (_fullExpression.Contains('%')) return;
+
+            // 2. Якщо є поточний ввід
             if (!string.IsNullOrEmpty(_currentInput))
             {
                 UpdateExpressionWithOperator(op);
+                return;
             }
-            else if (CanChangeOperator())
+
+            // 3. Спроба використати попередній результат
+            if (ShouldUseResultFromPreviousCalculation())
+            {
+                UseResultFromPreviousCalculation();
+                UpdateExpressionWithOperator(op);
+                return;
+            }
+
+            // 4. Зміна оператора
+            if (CanChangeOperator())
             {
                 ChangeOperator(op);
+                return;
             }
+
+            // 5. Стандартна поведінка
+            _fullExpression = $"0 {op} ";
+            _isNewInput = true;
         }
 
         public void HandleDecimalPoint()
@@ -94,34 +138,25 @@ namespace CalculatorCore
             if (_errorState || string.IsNullOrEmpty(_currentInput)) return;
             if (_currentInput.Contains('%')) return;
 
-            // Спеціальна обробка для чисел у дужках
-            //if (_currentInput.StartsWith("(") && _currentInput.EndsWith(")"))
-            //{
-            //    _currentInput = _currentInput.Insert(_currentInput.Length - 1, "%");
-            //}
-            //else
-            //{
             _currentInput += "%";
-            //}
-
             _isNewInput = false;
         }
 
         public void HandleEquals()
         {
-            if (_errorState || string.IsNullOrEmpty(_currentInput)) return;
+            if (_errorState || string.IsNullOrEmpty(_currentInput) || _fullExpression.Contains('='))
+            {
+                return; // Нічого не робимо, якщо вже є результат
+            }
 
             try
             {
                 ProcessCalculation();
+                _isNewInput = true;
             }
             catch
             {
                 SetErrorState();
-            }
-            finally
-            {
-                _isNewInput = true;
             }
         }
 
@@ -177,20 +212,34 @@ namespace CalculatorCore
 
         private bool ShouldUseResultFromPreviousCalculation()
         {
-            return string.IsNullOrEmpty(_currentInput) && _fullExpression.Contains('=');
+            return string.IsNullOrEmpty(_currentInput) &&
+                  (_fullExpression.Contains('=') || !string.IsNullOrEmpty(_fullExpression));
         }
 
         private void UseResultFromPreviousCalculation()
         {
-            _currentInput = _fullExpression.Split('=')[1].Trim();
+            if (_fullExpression.Contains('='))
+            {
+                string result = _fullExpression.Split('=')[1].Trim();
+                if (result.StartsWith("(") && result.EndsWith(")"))
+                {
+                    result = result.Substring(1, result.Length - 2);
+                }
+                _currentInput = result;
+            }
+            else
+            {
+                _currentInput = _formatter.Parse(_fullExpression.Trim()).ToString(CultureInfo.InvariantCulture);
+            }
             _fullExpression = "";
         }
 
         private void UpdateExpressionWithOperator(char op)
         {
             string displayNumber = _formatter.FormatForHistory(_currentInput);
-            _fullExpression = $"{displayNumber} {op} ";
+            _fullExpression = $"{displayNumber} {op} "; // Наприклад: "5 + "
             _isNewInput = true;
+            _hasDecimalPoint = false;
             _currentInput = "";
         }
 
@@ -288,7 +337,7 @@ namespace CalculatorCore
                 double number = _formatter.Parse(numberStr);
                 double result = _calculator.CalculateSimplePercent(number);
 
-                _currentInput = _formatter.FormatDisplay(result);
+                _currentInput = _formatter.FormatResultWithParentheses(result);
                 _fullExpression = _formatter.FormatExpression(
                     leftPart: _formatter.FormatPercentForHistory(number));
             }
@@ -317,7 +366,7 @@ namespace CalculatorCore
                 _calculator.SetOperation(baseNum, operation);
                 double result = _calculator.CalculateWithPercent(percent);
 
-                _currentInput = _formatter.FormatDisplay(result);
+                _currentInput = _formatter.FormatResultWithParentheses(result);
                 _fullExpression = _formatter.FormatExpression(
                     leftPart: _formatter.FormatDisplay(baseNum),
                     operation: operation.ToString(),
@@ -343,8 +392,8 @@ namespace CalculatorCore
                 double percentOf = _formatter.Parse(parts[0].Trim());
                 double number = _formatter.Parse(parts[1].Trim());
 
-                double calculated = _calculator.CalculatePercentOfNumber(percentOf, number);
-                _currentInput = _formatter.FormatDisplay(calculated);
+                double result = _calculator.CalculatePercentOfNumber(percentOf, number);
+                _currentInput = _formatter.FormatResultWithParentheses(result);
                 _fullExpression = _formatter.FormatExpression(
                     leftPart: $"{percentOf}%",
                     rightPart: _formatter.FormatDisplay(number));
@@ -357,7 +406,7 @@ namespace CalculatorCore
 
         private void ProcessRegularCalculation()
         {
-            if (string.IsNullOrEmpty(_fullExpression) || _fullExpression.Contains('=')) return;
+            if (string.IsNullOrEmpty(_fullExpression)/* || _fullExpression.Contains('=')*/) return;
 
             try
             {
@@ -371,11 +420,11 @@ namespace CalculatorCore
                 _calculator.SetOperation(firstNumber, op);
                 double result = _calculator.Calculate(secondNumber);
 
-                _currentInput = _formatter.FormatDisplay(result);
+                _currentInput = _formatter.FormatResultWithParentheses(result);
                 _fullExpression = _formatter.FormatExpression(
                     leftPart: parts[0],
                     operation: op.ToString(),
-                    rightPart: _formatter.FormatSecondOperand(secondNumber, _currentInput));
+                    rightPart: _formatter.FormatSecondOperand(secondNumber));
             }
             catch
             {

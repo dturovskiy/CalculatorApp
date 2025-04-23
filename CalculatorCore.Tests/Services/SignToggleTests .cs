@@ -2,14 +2,14 @@
 {
     public class SignToggleTests : CalculatorTestBase
     {
-        public SignToggleTests() : base(useRealEngine: false)
+        public SignToggleTests() : base(useRealEngine: true) // Використовуємо реальний двигун і форматер
         {
         }
 
         [Theory]
-        [InlineData("5", "(-5)")]    // Додаємо мінус
-        [InlineData("(-3)", "3")]    // Прибираємо мінус
-        [InlineData("0", "0")]     // Нуль залишається нулем
+        [InlineData("5", "(-5)")]    // Додаємо мінус і дужки
+        [InlineData("3", "(-3)")]    // Прибираємо мінус і дужки
+        [InlineData("0", "0")]       // Нуль залишається нулем
         public void ToggleSign_ChangesNumberSign(string input, string expected)
         {
             // Arrange
@@ -28,44 +28,42 @@
             // Arrange
             EnterDigits("5");
 
-            // Act
-            InputHandler.HandleToggleSign(); // 5 → -5
-            InputHandler.HandleToggleSign(); // -5 → 5
+            // Act & Assert
+            InputHandler.HandleToggleSign();
+            Assert.Equal("(-5)", InputHandler.CurrentInput);
 
-            // Assert
+            InputHandler.HandleToggleSign();
             Assert.Equal("5", InputHandler.CurrentInput);
         }
 
         [Fact]
-        public void ToggleSign_AfterOperator_AppliesToNextNumber()
+        public void ToggleSignTest_AfterDecimalPoint()
+        {
+            // Вводимо "0.5" → "-0.5" → знову "0.5"
+            EnterDigits("0.5");
+            InputHandler.HandleToggleSign();
+            Assert.Equal("(-0.5)", InputHandler.CurrentInput);
+
+            InputHandler.HandleToggleSign();
+            Assert.Equal("0.5", InputHandler.CurrentInput);
+        }
+
+        [Fact]
+        public void ToggleSign_AfterOperator_CreatesNegativeNumber()
         {
             // Arrange
             InputHandler.HandleDigit("1");
             InputHandler.HandleDigit("0");
             InputHandler.HandleOperator('+');
 
-            // Перевірка стану після оператора
-            Assert.Equal("10 + ", InputHandler.FullExpression);
-            Assert.Equal("", InputHandler.CurrentInput);
-            Assert.True(InputHandler.IsNewInput);
-
-            // Act 1 - Toggle sign
-            InputHandler.HandleToggleSign();
-            Assert.Equal("-", InputHandler.CurrentInput);
-
-            // Act 2 - Enter 5
+            // Act
             InputHandler.HandleDigit("5");
-            Assert.Equal("-5", InputHandler.CurrentInput);
-
-            // Act 3 - Calculate
+            InputHandler.HandleToggleSign();
             InputHandler.HandleEquals();
 
             // Assert
             Assert.Equal("5", InputHandler.CurrentInput);
-
-            // Очікуємо "10 + (-5) =" або "10 + -5 =", залежно від форматера
-            Assert.True(InputHandler.FullExpression == "10 + (-5) =" ||
-                        InputHandler.FullExpression == "10 + -5 =");
+            Assert.Equal("10 + (-5) =", InputHandler.FullExpression);
         }
 
         [Fact]

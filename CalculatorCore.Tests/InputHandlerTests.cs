@@ -170,7 +170,7 @@ namespace CalculatorCore.Tests
             _handler.HandlePercent();
             _handler.HandleEquals();
 
-            Assert.Equal("-110", _handler.CurrentInput);
+            Assert.Equal("(-110)", _handler.CurrentInput);
             Assert.Equal("(-100) + 10% =", _handler.FullExpression);
         }
 
@@ -340,7 +340,7 @@ namespace CalculatorCore.Tests
             _handler.HandlePercent();
             _handler.HandleEquals();
 
-            Assert.Equal("-0.03", _handler.CurrentInput);
+            Assert.Equal("(-0.03)", _handler.CurrentInput);
             Assert.Equal("(-3%) =", _handler.FullExpression);
         }
 
@@ -354,7 +354,7 @@ namespace CalculatorCore.Tests
             _handler.HandleToggleSign(); // змінюємо знак ПІСЛЯ %
             _handler.HandleEquals();
 
-            Assert.Equal("-0.03", _handler.CurrentInput);
+            Assert.Equal("(-0.03)", _handler.CurrentInput);
             Assert.Equal("(-3%) =", _handler.FullExpression);
         }
 
