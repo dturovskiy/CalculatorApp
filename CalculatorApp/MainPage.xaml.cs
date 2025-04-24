@@ -76,5 +76,26 @@ namespace CalculatorApp
 
             HistoryLabel.Text = _inputHandler.FullExpression;
         }
+
+        private void OnPageSizeChanged(object sender, EventArgs e)
+        {
+            // Тут можна додати логіку для адаптації під різні розміри екрану
+            var page = (ContentPage)sender;
+            double width = page.Width;
+            double height = page.Height;
+
+            if (width > height)
+            {
+                // Ландшафтний режим
+                HistoryLabel.FontSize = 16;
+                DisplayLabel.FontSize = 24;
+            }
+            else
+            {
+                // Портретний режим
+                HistoryLabel.FontSize = 20;
+                DisplayLabel.FontSize = 32;
+            }
+        }
     }
 }
