@@ -6,15 +6,16 @@ namespace CalculatorCore.Tests
     {
         private readonly CalculatorEngine _engine = new();
         private readonly InputHandler _inputHandler;
+        private readonly ExpressionFormatter _expressionFormatter = new();
 
         public CultureTests()
         {
-            _inputHandler = new InputHandler(_engine);
+            _inputHandler = new InputHandler(_engine, _expressionFormatter);
         }
 
         [Theory]
         [InlineData("en-US", "5.2", "+", "3.7", "8.9")]
-        [InlineData("uk-UA", "5,2", "+", "3,7", "8.9")]
+        [InlineData("uk-UA", "5.2", "+", "3.7", "8.9")]
         public void HandleDecimal_WithDifferentCultures_UsesInvariant(string culture, string a, string op, string b, string expected)
         {
             // Arrange
@@ -22,12 +23,27 @@ namespace CalculatorCore.Tests
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
 
             var engine = new CalculatorEngine();
-            var handler = new InputHandler(engine);
+            var handler = new InputHandler(engine, _expressionFormatter);
 
-            // Act
-            handler.HandleDigit(a.Replace(",", ".")); // Приводимо до інваріантного формату
+            // Act (коректне введення з урахуванням крапки)
+            foreach (var ch in a)
+            {
+                if (ch == '.')
+                    handler.HandleDecimalPoint(); // Використовуємо метод для крапки
+                else
+                    handler.HandleDigit(ch.ToString());
+            }
+
             handler.HandleOperator(op[0]);
-            handler.HandleDigit(b.Replace(",", "."));
+
+            foreach (var ch in b)
+            {
+                if (ch == '.')
+                    handler.HandleDecimalPoint();
+                else
+                    handler.HandleDigit(ch.ToString());
+            }
+
             handler.HandleEquals();
 
             // Assert
