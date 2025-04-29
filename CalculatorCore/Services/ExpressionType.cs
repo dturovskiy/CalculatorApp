@@ -1,4 +1,4 @@
-﻿namespace CalculatorCore
+﻿namespace CalculatorCore.Services
 {
     internal enum ExpressionType
     {
