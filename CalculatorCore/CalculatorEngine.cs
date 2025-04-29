@@ -4,6 +4,7 @@ namespace CalculatorCore
 {
     public class CalculatorEngine : ICalculatorEngine
     {
+
         private double _storedNumber = 0;
         private char _pendingOperator = '\0';
         private bool _errorState = false;

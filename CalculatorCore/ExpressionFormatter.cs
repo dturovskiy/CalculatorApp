@@ -8,13 +8,11 @@ namespace CalculatorCore
         // 1. Метод для форматування чисел (на вивід)
         public string FormatDisplay(double number)
         {
-            // Якщо число дуже велике або дуже мале, використовуємо наукову нотацію
-            if (Math.Abs(number) >= 1_000_000_000_000 || (Math.Abs(number) < 0.0001 && number != 0))
+            // Змінюємо умову для наукової нотації
+            if (Math.Abs(number) >= 1_000_000_000_000 || (Math.Abs(number) < 0.00001 && number != 0))
             {
                 return number.ToString("0.##############E+0", CultureInfo.InvariantCulture);
             }
-
-            // Для звичайних чисел використовуємо поточний формат
             return number.ToString("0.###############", CultureInfo.InvariantCulture);
         }
 
@@ -177,7 +175,7 @@ namespace CalculatorCore
             if (isPercent)
             {
                 string number = input[..^1]; // без '%'
-                return $"(-{number})%";
+                return $"(-{number}%)";
             }
 
             // Випадок: (-5) → 5
@@ -187,6 +185,5 @@ namespace CalculatorCore
             // Випадок: 5 → (-5)
             return $"(-{input})";
         }
-
     }
 }
