@@ -187,6 +187,5 @@ namespace CalculatorCore
             // Випадок: 5 → (-5)
             return $"(-{input})";
         }
-
     }
 }

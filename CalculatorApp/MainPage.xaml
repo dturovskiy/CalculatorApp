@@ -59,7 +59,7 @@
             <Button Text="7" Grid.Row="1" Grid.Column="0" Clicked="OnDigitClicked"/>
             <Button Text="8" Grid.Row="1" Grid.Column="1" Clicked="OnDigitClicked"/>
             <Button Text="9" Grid.Row="1" Grid.Column="2" Clicked="OnDigitClicked"/>
-            <Button Text="×" Grid.Row="1" Grid.Column="3" Clicked="OnOperatorClicked"
+            <Button Text="*" Grid.Row="1" Grid.Column="3" Clicked="OnOperatorClicked"
                     Style="{StaticResource OperatorButton}"/>
 
             <!-- Ряд 3 -->
