@@ -1,4 +1,5 @@
 ﻿using CalculatorCore.Services;
+using System.Diagnostics;
 
 namespace CalculatorCore
 {
@@ -40,7 +41,13 @@ namespace CalculatorCore
                            : throw new DivideByZeroException("Division by zero is not allowed"),
                     _ => throw new InvalidOperationException("Unknown operator")
                 };
+                _errorState = false; // Скидаємо помилку при успішному обчисленні
                 return result;
+            }
+            catch (Exception ex) when (ex is DivideByZeroException or InvalidOperationException)
+            {
+                _errorState = true; // Встановлюємо стан помилки
+                throw;
             }
             finally
             {
@@ -53,12 +60,12 @@ namespace CalculatorCore
         public double CalculatePercentOfNumber(double percent, double number)
         {
             // Логування значень перед обчисленням
-            Console.WriteLine($"Percent: {percent}, Number: {number}");
+            Debug.WriteLine($"Percent: {percent}, Number: {number}");
 
             double result = (percent / 100) * number;
 
             // Логування результату
-            Console.WriteLine($"Calculated Result: {result}");
+            Debug.WriteLine($"Calculated Result: {result}");
 
             return result;
         }

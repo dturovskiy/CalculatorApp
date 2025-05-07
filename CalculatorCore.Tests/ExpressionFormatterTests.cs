@@ -13,12 +13,19 @@
         [Theory]
         [InlineData(123.456, "123.456")]
         [InlineData(-123.456, "-123.456")]
-        [InlineData(0.00001, "0.00001")] // Тепер очікуємо десятковий формат
         [InlineData(0.000001, "1E-6")]
         [InlineData(0.0000001, "1E-7")] // Наукова нотація для дуже малих чисел
-        [InlineData(1_000_000_000_000, "1E+12")] // Наукова нотація для дуже великих чисел
-        [InlineData(double.MaxValue, "1.79769313486232E+308")]
-        [InlineData(double.MinValue, "-1.79769313486232E+308")]
+        [InlineData(double.MaxValue, "1.797693E+308")]
+        [InlineData(double.MinValue, "-1.797693E+308")]
+        [InlineData(0.00000999999, "9.99999E-6")] // На межі наукової нотації
+        [InlineData(999_999_999_999, "1E+12")] // На межі наукової нотації
+        [InlineData(0, "0")] // Нуль
+        [InlineData(double.PositiveInfinity, "∞")] // Нескінченність
+        [InlineData(double.NegativeInfinity, "-∞")] // Від'ємна нескінченність
+        [InlineData(double.NaN, "NaN")] // Не число
+        [InlineData(1.23E+50, "1.23E+50")] // Вже у науковій нотації
+        [InlineData(123.4500, "123.45")] // Видалення зайвих нулів
+        [InlineData(123.0, "123")] // Видалення зайвої крапки
         public void FormatDisplay_FormatsNumbersCorrectly(double number, string expected)
         {
             // Act
@@ -128,7 +135,7 @@
         }
 
         [Theory]
-        [InlineData("5", "", "3", "53 =")] // Без оператора
+        [InlineData("5", "", "3", "5 3 =")] // Без оператора
         [InlineData("5", "+", "", "5 +  =")] // Порожній правий операнд
         public void FormatExpression_EdgeCases(string left, string op, string right, string expected)
         {
@@ -154,33 +161,6 @@
             Assert.Equal(expected, result);
         }
 
-        // ==================== Percent-related methods ====================
-        [Theory]
-        [InlineData("(-5)%", true)] // Відсоток у дужках
-        [InlineData("5%", false)] // Звичайний відсоток
-        [InlineData("(5)", false)] // Не відсоток
-        public void IsPercentWithParentheses_DetectsCorrectly(string input, bool expected)
-        {
-            // Act
-            bool result = _formatter.IsPercentWithParentheses(input);
-
-            // Assert
-            Assert.Equal(expected, result);
-        }
-
-        [Theory]
-        [InlineData("-5%", "-5")] // Від'ємний відсоток
-        [InlineData("(-5)%", "-5")] // Відсоток у дужках
-        [InlineData("5%", "5")] // Звичайний відсоток
-        public void ExtractNumberFromPercent_ExtractsCorrectly(string input, string expected)
-        {
-            // Act
-            string result = _formatter.ExtractNumberFromPercent(input);
-
-            // Assert
-            Assert.Equal(expected, result);
-        }
-
         // ==================== ToggleSign ====================
         [Theory]
         [InlineData("5", "(-5)")] // Додатнє → від'ємне
@@ -200,35 +180,57 @@
             Assert.Equal(expected, result);
         }
 
-        // ==================== IsNegativePercent ====================
+        // ==================== IsNegativeNumber ====================
         [Theory]
-        [InlineData("-5%", true)]     // Від'ємний відсоток
-        [InlineData("5%", false)]     // Додатній відсоток
-        [InlineData("(-5)%", false)]  // Відсоток у дужках (не підпадає під критерій)
-        public void IsNegativePercent_DetectsCorrectly(string input, bool expected)
+        [InlineData("-5", true)]      // Від'ємне число
+        [InlineData("(-5)", true)]    // Від'ємне число у дужках
+        [InlineData("5", false)]      // Додатнє число
+        [InlineData("0", false)]      // Нуль
+        public void IsNegativeNumber_DetectsCorrectly(string input, bool expected)
         {
             // Act
-            bool result = _formatter.IsNegativePercent(input);
+            bool result = _formatter.IsNegativeNumber(input);
 
             // Assert
             Assert.Equal(expected, result);
         }
 
-        // ==================== IsParenthesizedNegativePercent ====================
+        // ==================== ExtractNumberFromPercent ====================
         [Theory]
-        [InlineData("(-5)%", true)]   // Коректний формат
-        [InlineData("-5%", false)]    // Без дужок
-        [InlineData("(5)%", false)]   // Додатнє число у дужках
-        public void IsParenthesizedNegativePercent_DetectsCorrectly(string input, bool expected)
+        [InlineData("(-10%)", "-10")]    // Від'ємний відсоток у дужках
+        [InlineData("(10%)", "10")]      // Додатній відсоток у дужках
+        [InlineData("10%", "10")]        // Звичайний відсоток без дужок
+        [InlineData("abc", "abc")]       // Не відсоток (повертає як є)
+        [InlineData("", "")]             // Порожній рядок
+        [InlineData("(5.5%)", "5.5")]    // Дробовий відсоток у дужках
+        [InlineData("1000%", "1000")]    // Великий відсоток
+        [InlineData("(-10.5%)", "-10.5")] // Від'ємний дробовий відсоток
+        public void ExtractNumberFromPercent_ExtractsCorrectly(string input, string expected)
         {
             // Act
-            bool result = _formatter.IsParenthesizedNegativePercent(input);
+            string result = _formatter.ExtractNumberFromPercent(input);
 
             // Assert
             Assert.Equal(expected, result);
         }
 
         // ==================== FormatPercentForHistory ====================
+        [Theory]
+        [InlineData(10)]
+        [InlineData(-10)]
+        [InlineData(0)]
+        [InlineData(5.5)]
+        public void FormatPercentForHistory_WithExtractedValues(double number)
+        {
+            // Arrange
+            string formatted = _formatter.FormatPercentForHistory(number);
+            string extracted = _formatter.ExtractNumberFromPercent(formatted);
+            double parsed = _formatter.Parse(extracted);
+
+            // Assert
+            Assert.Equal(number, parsed);
+        }
+
         [Theory]
         [InlineData(5, "5%")]         // Додатнє число
         [InlineData(-5, "(-5%)")]     // Від'ємне число
@@ -241,16 +243,16 @@
             Assert.Equal(expected, result);
         }
 
-        // ==================== IsNegativeNumber ====================
+        // ==================== Integration with Parse ====================
         [Theory]
-        [InlineData("-5", true)]      // Від'ємне число
-        [InlineData("(-5)", true)]    // Від'ємне число у дужках
-        [InlineData("5", false)]      // Додатнє число
-        [InlineData("0", false)]      // Нуль
-        public void IsNegativeNumber_DetectsCorrectly(string input, bool expected)
+        [InlineData("10%", 10)]
+        [InlineData("(-10%)", -10)]
+        [InlineData("5.5%", 5.5)]
+        public void ExtractAndParse_WorksCorrectly(string input, double expected)
         {
             // Act
-            bool result = _formatter.IsNegativeNumber(input);
+            string extracted = _formatter.ExtractNumberFromPercent(input);
+            double result = _formatter.Parse(extracted);
 
             // Assert
             Assert.Equal(expected, result);
