@@ -1,37 +1,50 @@
 ﻿using CalculatorCore;
 using CalculatorCore.Services;
+using System.Diagnostics;
 
 namespace CalculatorApp
 {
     public partial class MainPage : ContentPage
     {
         private readonly InputHandler _inputHandler;
+        private double defaultFontSize = 55; // Початковий розмір шрифту
+        private double maxLabelWidth = 250; // Узгоджено з WidthRequest
+        private const int maxTextLength = 12; // Максимальна кількість символів
 
         public MainPage(IInputHandler inputHandler)
         {
             InitializeComponent();
             _inputHandler = (InputHandler)inputHandler;
             UpdateDisplay();
+            SizeChanged += OnPageSizeChanged; // Підписка на зміну розміру
         }
 
         private void OnDigitClicked(object sender, EventArgs e)
         {
             var button = (Button)sender;
-            _inputHandler.HandleDigit(button.Text);
-            UpdateDisplay();
+            if (_inputHandler.CurrentInput.Length < maxTextLength)
+            {
+                _inputHandler.HandleDigit(button.Text);
+                UpdateDisplay();
+            }
         }
 
         private void OnOperatorClicked(object sender, EventArgs e)
         {
             var button = (Button)sender;
+            char op = button.Text[0] == '×' ? '*' : button.Text[0];
+            Debug.WriteLine($"Operator clicked: {button.Text[0]} -> {op}");
             _inputHandler.HandleOperator(button.Text[0]);
             UpdateDisplay();
         }
 
         private void OnDecimalPointClicked(object sender, EventArgs e)
         {
-            _inputHandler.HandleDecimalPoint();
-            UpdateDisplay();
+            if (_inputHandler.CurrentInput.Length < maxTextLength)
+            {
+                _inputHandler.HandleDecimalPoint();
+                UpdateDisplay();
+            }
         }
 
         private void OnToggleSignClicked(object sender, EventArgs e)
@@ -75,27 +88,53 @@ namespace CalculatorApp
                 : _inputHandler.CurrentInput;
 
             HistoryLabel.Text = _inputHandler.FullExpression;
+
+            UpdateDisplayFontSize(); // Оновлення розміру шрифту
         }
 
-        private void OnPageSizeChanged(object sender, EventArgs e)
+        private void UpdateDisplayFontSize()
         {
-            // Тут можна додати логіку для адаптації під різні розміри екрану
-            var page = (ContentPage)sender;
+            var label = DisplayLabel;
+            int textLength = label.Text.Length;
+
+            // Динамічне зменшення шрифту залежно від довжини тексту
+            if (textLength > 8)
+            {
+                double scale = 8.0 / textLength; // Зменшуємо пропорційно
+                label.FontSize = defaultFontSize * scale;
+            }
+            else
+            {
+                label.FontSize = defaultFontSize;
+            }
+        }
+
+        private void OnPageSizeChanged(object? sender, EventArgs e)
+        {
+            var page = (ContentPage)sender!;
             double width = page.Width;
             double height = page.Height;
 
             if (width > height)
             {
                 // Ландшафтний режим
-                HistoryLabel.FontSize = 16;
-                DisplayLabel.FontSize = 24;
+                HistoryLabel.FontSize = 24;
+                defaultFontSize = 40;
+                maxLabelWidth = 200;
+                DisplayLabel.WidthRequest = 200;
+                DisplayLabel.MaximumWidthRequest = 200;
             }
             else
             {
                 // Портретний режим
-                HistoryLabel.FontSize = 20;
-                DisplayLabel.FontSize = 32;
+                HistoryLabel.FontSize = 35;
+                defaultFontSize = 55;
+                maxLabelWidth = 280;
+                DisplayLabel.WidthRequest = 250;
+                DisplayLabel.MaximumWidthRequest = 250;
             }
+
+            UpdateDisplayFontSize(); // Оновлюємо шрифт після зміни режиму
         }
     }
 }

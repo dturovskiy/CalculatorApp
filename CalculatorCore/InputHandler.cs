@@ -1,4 +1,5 @@
 ﻿using CalculatorCore.Services;
+using System.Diagnostics;
 using System.Globalization;
 
 namespace CalculatorCore
@@ -55,6 +56,7 @@ namespace CalculatorCore
 
             // 2. Форматуємо для історії (з урахуванням дужок)
             string formattedResult = _formatter.FormatForHistory(result);
+            char displayOp = op == '*' ? '×' : op;
 
             // 3. Створюємо новий вираз
             _fullExpression = $"{formattedResult} {op} ";
@@ -240,16 +242,6 @@ namespace CalculatorCore
                 return false;
             }
 
-            //if (!string.IsNullOrEmpty(_fullExpression))
-            //{
-            //    char lastChar = _fullExpression.TrimEnd().LastOrDefault();
-            //    if ("+-*/".Contains(lastChar))
-            //    {
-            //        // Не дозволяти другий оператор підряд
-            //        return true;
-            //    }
-            //}
-
             return false;
         }
 
@@ -281,7 +273,8 @@ namespace CalculatorCore
         private void UpdateExpressionWithOperator(char op)
         {
             string displayNumber = _formatter.FormatForHistory(_currentInput);
-            _fullExpression = $"{displayNumber} {op} "; // Наприклад: "5 + "
+            char displayOp = op == '*' ? '×' : op; // Використовуємо × для відображення
+            _fullExpression = $"{displayNumber} {displayOp} "; // Наприклад: "5 × "
             _isNewInput = true;
             _hasDecimalPoint = false;
             _currentInput = "";
@@ -295,17 +288,17 @@ namespace CalculatorCore
             // 3. Немає поточного вводу
             return !string.IsNullOrEmpty(_fullExpression) &&
                    _fullExpression.TrimEnd().EndsWith(" " + _fullExpression.TrimEnd().Last()) &&
-                   "+-*/".Contains(_fullExpression.TrimEnd().Last()) &&
+                   "+-*×/".Contains(_fullExpression.TrimEnd().Last()) &&
                    string.IsNullOrEmpty(_currentInput);
         }
 
         private void ChangeOperator(char op)
         {
-            // Безпечний спосіб замінити останній оператор
             var parts = _fullExpression.TrimEnd().Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length >= 2)
             {
-                parts[^1] = op.ToString();
+                char displayOp = op == '*' ? '×' : op; // Використовуємо ×
+                parts[^1] = displayOp.ToString();
                 _fullExpression = string.Join(" ", parts) + " ";
             }
         }
@@ -377,35 +370,31 @@ namespace CalculatorCore
 
         private void ProcessPercentFirstOperation()
         {
-            // Приклад:
-            // _fullExpression = "50% + " або "(-10%) * "
-            // _currentInput = "20"
-
-            // 1. Перевірка формату _fullExpression
             var parts = _fullExpression.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 2 || !parts[0].Contains('%') || !"+ - * /".Contains(parts[1]))
+            if (parts.Length < 2 || !parts[0].Contains('%') || !"+ - × /".Contains(parts[1]))
             {
+                System.Diagnostics.Debug.WriteLine($"Invalid percent first operation format: [{string.Join(", ", parts)}]");
                 SetErrorState();
                 return;
             }
 
-            // 2. Парсинг відсотка з автоматичним форматуванням
             string percentStr = parts[0];
             double percentNumber;
             try
             {
                 percentNumber = _formatter.Parse(_formatter.ExtractNumberFromPercent(percentStr));
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error parsing percent: {ex.Message}");
                 SetErrorState();
                 return;
             }
             string formattedPercent = _formatter.FormatPercentForHistory(percentNumber);
 
-            // 3. Парсинг другого числа
             if (string.IsNullOrEmpty(_currentInput))
             {
+                System.Diagnostics.Debug.WriteLine("Empty current input in percent first operation");
                 SetErrorState();
                 return;
             }
@@ -415,28 +404,29 @@ namespace CalculatorCore
             {
                 secondNumber = _formatter.Parse(_currentInput);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error parsing second number: {ex.Message}");
                 SetErrorState();
                 return;
             }
 
-            // 4. Виконання операції
-            char op = parts[1][0];
+            char op = parts[1][0] == '×' ? '*' : parts[1][0]; // Перетворюємо × на * перед використанням
             try
             {
+                System.Diagnostics.Debug.WriteLine($"Percent operation: {percentNumber / 100} {op} {secondNumber}");
                 _calculator.SetOperation(percentNumber / 100, op);
                 double result = _calculator.Calculate(secondNumber);
 
-                // 5. Форматування результату з урахуванням усіх особливостей
                 _currentInput = _formatter.FormatResultWithParentheses(result);
                 _fullExpression = _formatter.FormatExpression(
                     leftPart: formattedPercent,
-                    operation: op.ToString(),
+                    operation: op == '*' ? "×" : op.ToString(), // Відображаємо × у виразі
                     rightPart: _formatter.FormatSecondOperand(secondNumber));
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error calculating percent first operation: {ex.Message}");
                 SetErrorState();
             }
         }
@@ -499,21 +489,23 @@ namespace CalculatorCore
             try
             {
                 double baseNum = _formatter.Parse(opParts[0]);
-                char operation = opParts[1][0];
+                char operation = opParts[1][0] == '×' ? '*' : opParts[1][0]; // Перетворюємо × на *
                 string percentStr = _formatter.ExtractNumberFromPercent(_currentInput);
                 double percent = _formatter.Parse(percentStr);
 
+                System.Diagnostics.Debug.WriteLine($"Percent operation: {baseNum} {operation} {percent}%");
                 _calculator.SetOperation(baseNum, operation);
                 double result = _calculator.CalculateWithPercent(percent);
 
                 _currentInput = _formatter.FormatResultWithParentheses(result);
                 _fullExpression = _formatter.FormatExpression(
                     leftPart: _formatter.FormatDisplay(baseNum),
-                    operation: operation.ToString(),
+                    operation: operation == '*' ? "×" : operation.ToString(), // Відображаємо ×
                     rightPart: _formatter.FormatPercentForHistory(percent));
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error in ProcessPercentOperation: {ex.Message}");
                 SetErrorState();
             }
         }
@@ -546,16 +538,28 @@ namespace CalculatorCore
 
         private void ProcessRegularCalculation()
         {
-            if (string.IsNullOrEmpty(_fullExpression)/* || _fullExpression.Contains('=')*/) return;
+            if (string.IsNullOrEmpty(_fullExpression))
+            {
+                System.Diagnostics.Debug.WriteLine("ProcessRegularCalculation: Empty expression");
+                return;
+            }
 
             try
             {
                 var parts = _fullExpression.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length < 2) throw new FormatException("Invalid expression format");
+                System.Diagnostics.Debug.WriteLine($"Expression parts: [{string.Join(", ", parts)}], CurrentInput: {_currentInput}");
+
+                if (parts.Length < 2)
+                {
+                    System.Diagnostics.Debug.WriteLine("Invalid expression format: too few parts");
+                    throw new FormatException("Invalid expression format");
+                }
 
                 double firstNumber = _formatter.Parse(parts[0]);
-                char op = parts[1][0];
+                char op = parts[1][0] == '×' ? '*' : parts[1][0]; // Перетворюємо × на * перед використанням
                 double secondNumber = _formatter.Parse(_currentInput);
+
+                System.Diagnostics.Debug.WriteLine($"Calculating: {firstNumber} {op} {secondNumber}");
 
                 _calculator.SetOperation(firstNumber, op);
                 double result = _calculator.Calculate(secondNumber);
@@ -563,11 +567,12 @@ namespace CalculatorCore
                 _currentInput = _formatter.FormatResultWithParentheses(result);
                 _fullExpression = _formatter.FormatExpression(
                     leftPart: parts[0],
-                    operation: op.ToString(),
+                    operation: op == '*' ? "×" : op.ToString(), // Відображаємо × у виразі
                     rightPart: _formatter.FormatSecondOperand(secondNumber));
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error in ProcessRegularCalculation: {ex.Message}");
                 SetErrorState();
             }
         }
@@ -581,13 +586,15 @@ namespace CalculatorCore
         {
             bool hasOperator = _fullExpression.Contains(" + ") ||
                               _fullExpression.Contains(" - ") ||
-                              _fullExpression.Contains(" * ") ||
+                              _fullExpression.Contains(" × ") ||
                               _fullExpression.Contains(" / ");
 
             bool currentEndsWithPercent = _currentInput.EndsWith('%');
             bool currentHasPercent = _currentInput.Contains('%');
             bool historyHasPercent = _fullExpression.Contains('%');
             bool currentHasParentheses = _currentInput.StartsWith('(') && _currentInput.EndsWith(')');
+
+            Debug.WriteLine($"Expression: {_fullExpression}, CurrentInput: {_currentInput}, HasOperator: {hasOperator}");
 
             // 1. A% (Standalone)
             if (currentEndsWithPercent && !hasOperator && !historyHasPercent || (currentHasParentheses && currentHasPercent))

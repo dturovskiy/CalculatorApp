@@ -35,7 +35,7 @@
         [Theory]
         [InlineData('+')]
         [InlineData('-')]
-        [InlineData('*')]
+        [InlineData('×')]
         [InlineData('/')]
         public void HandleOperator_WithCurrentInput_UpdatesExpression(char op)
         {

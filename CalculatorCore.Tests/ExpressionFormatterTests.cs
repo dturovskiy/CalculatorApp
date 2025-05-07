@@ -96,7 +96,7 @@
         // ==================== FormatExpression ====================
         [Theory]
         [InlineData("5", "+", "3", "5 + 3 =")]
-        [InlineData("-5", "*", "3", "(-5) * 3 =")]
+        [InlineData("-5", "×", "3", "(-5) × 3 =")]
         [InlineData("10%", "-", "5%", "10% - 5% =")]
         public void FormatExpression_FormatsCorrectly(string left, string op, string right, string expected)
         {

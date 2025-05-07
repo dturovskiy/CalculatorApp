@@ -123,14 +123,15 @@ namespace CalculatorCore
         {
             string formattedLeft = FormatForHistory(leftPart);
             string formattedRight = !string.IsNullOrEmpty(rightPart) ? FormatForHistory(rightPart) : "";
+            string displayOperation = operation == "*" ? "×" : operation; // Зміна * на ×
 
             if (rightPart.EndsWith('%'))
             {
                 formattedRight = rightPart;
             }
 
-            return !string.IsNullOrEmpty(operation)
-                ? $"{formattedLeft} {operation} {formattedRight} ="
+            return !string.IsNullOrEmpty(displayOperation)
+                ? $"{formattedLeft} {displayOperation} {formattedRight} ="
                 : $"{formattedLeft} {formattedRight} =";
         }
 
