@@ -43,6 +43,7 @@ namespace CalculatorCore
                 HandleOperatorAfterEquals(op);
                 return;
             }
+
             HandleRegularOperator(op);
         }
 
@@ -129,6 +130,10 @@ namespace CalculatorCore
             if (fullClear || string.IsNullOrEmpty(_currentInput))
             {
                 Reset();
+            }
+            else if (_currentInput.StartsWith('('))
+            {
+                HandleToggleSign();
             }
             else
             {
@@ -235,15 +240,15 @@ namespace CalculatorCore
                 return false;
             }
 
-            if (!string.IsNullOrEmpty(_fullExpression))
-            {
-                char lastChar = _fullExpression.TrimEnd().LastOrDefault();
-                if ("+-*/".Contains(lastChar))
-                {
-                    // Не дозволяти другий оператор підряд
-                    return true;
-                }
-            }
+            //if (!string.IsNullOrEmpty(_fullExpression))
+            //{
+            //    char lastChar = _fullExpression.TrimEnd().LastOrDefault();
+            //    if ("+-*/".Contains(lastChar))
+            //    {
+            //        // Не дозволяти другий оператор підряд
+            //        return true;
+            //    }
+            //}
 
             return false;
         }
@@ -284,12 +289,25 @@ namespace CalculatorCore
 
         private bool CanChangeOperator()
         {
-            return !string.IsNullOrEmpty(_fullExpression) && !_fullExpression.Contains('=');
+            // Можна змінити оператор, якщо:
+            // 1. Є вираз
+            // 2. Вираз закінчується на оператор (з пробілом)
+            // 3. Немає поточного вводу
+            return !string.IsNullOrEmpty(_fullExpression) &&
+                   _fullExpression.TrimEnd().EndsWith(" " + _fullExpression.TrimEnd().Last()) &&
+                   "+-*/".Contains(_fullExpression.TrimEnd().Last()) &&
+                   string.IsNullOrEmpty(_currentInput);
         }
 
         private void ChangeOperator(char op)
         {
-            _fullExpression = _fullExpression[..^2] + op + " ";
+            // Безпечний спосіб замінити останній оператор
+            var parts = _fullExpression.TrimEnd().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+            {
+                parts[^1] = op.ToString();
+                _fullExpression = string.Join(" ", parts) + " ";
+            }
         }
 
         private void StartNewDecimalInput()
@@ -572,7 +590,7 @@ namespace CalculatorCore
             bool currentHasParentheses = _currentInput.StartsWith('(') && _currentInput.EndsWith(')');
 
             // 1. A% (Standalone)
-            if (currentEndsWithPercent && !hasOperator && !historyHasPercent || currentHasParentheses)
+            if (currentEndsWithPercent && !hasOperator && !historyHasPercent || (currentHasParentheses && currentHasPercent))
                 return ExpressionType.StandalonePercent;
 
             // 2. A + B% (Operation with percent)
