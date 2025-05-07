@@ -99,13 +99,16 @@ namespace CalculatorCore
         {
             if (_errorState) return;
 
-            if (_isNewInput)
+            if (!_currentInput.EndsWith('%'))
             {
-                StartNewDecimalInput();
-            }
-            else if (!_hasDecimalPoint)
-            {
-                AddDecimalPointToInput();
+                if (_isNewInput)
+                {
+                    StartNewDecimalInput();
+                }
+                else if (!_hasDecimalPoint)
+                {
+                    AddDecimalPointToInput();
+                }
             }
         }
 
@@ -137,6 +140,19 @@ namespace CalculatorCore
         {
             if (_errorState || string.IsNullOrEmpty(_currentInput)) return;
             if (_currentInput.Contains('%')) return;
+
+            // Видаляємо крапку в кінці (якщо є)
+            if (_currentInput.EndsWith("."))
+            {
+                _currentInput = _currentInput[..^1]; // Видаляємо останній символ (крапку)
+                _hasDecimalPoint = false; // Скидаємо прапорець крапки
+            }
+
+            if (!string.IsNullOrEmpty(_fullExpression) && _fullExpression.Contains('='))
+            {
+                _fullExpression = $"";
+                _isNewInput = true;
+            }
 
             _currentInput += "%";
             _isNewInput = false;
@@ -207,8 +223,31 @@ namespace CalculatorCore
                 return true;
             }
 
-            return _fullExpression.Contains('%');
+            if (string.IsNullOrWhiteSpace(_currentInput) && string.IsNullOrWhiteSpace(_fullExpression))
+            {
+                // Не можна починати вираз з оператора
+                return true;
+            }
+
+            if (_fullExpression.Contains('='))
+            {
+                // Після '=', оператор дозволено
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(_fullExpression))
+            {
+                char lastChar = _fullExpression.TrimEnd().LastOrDefault();
+                if ("+-*/".Contains(lastChar))
+                {
+                    // Не дозволяти другий оператор підряд
+                    return true;
+                }
+            }
+
+            return false;
         }
+
 
         private bool ShouldUseResultFromPreviousCalculation()
         {
@@ -223,7 +262,7 @@ namespace CalculatorCore
                 string result = _fullExpression.Split('=')[1].Trim();
                 if (result.StartsWith("(") && result.EndsWith(")"))
                 {
-                    result = result.Substring(1, result.Length - 2);
+                    result = result[1..^1];
                 }
                 _currentInput = result;
             }
@@ -255,10 +294,18 @@ namespace CalculatorCore
 
         private void StartNewDecimalInput()
         {
-            _currentInput = "0.";
-            _fullExpression = "";
-            _isNewInput = false;
-            _hasDecimalPoint = true;
+
+            if (!string.IsNullOrEmpty(_currentInput) && _fullExpression.Contains('=') && !_currentInput.Contains('.'))
+            {
+                _fullExpression = $"";
+                AddDecimalPointToInput();
+                _isNewInput = false;
+            }
+
+            //_currentInput = "0.";
+            //_fullExpression = "";
+
+
         }
 
         private void AddDecimalPointToInput()
@@ -269,6 +316,12 @@ namespace CalculatorCore
 
         private void Backspace()
         {
+            if (_currentInput.Length == 0) return;
+
+            // Скидаємо прапорець крапки, якщо видаляємо її
+            if (_currentInput.EndsWith('.'))
+                _hasDecimalPoint = false;
+
             _currentInput = _currentInput[..^1];
 
             if (_currentInput == "0" || string.IsNullOrEmpty(_currentInput))
@@ -289,15 +342,84 @@ namespace CalculatorCore
                 case ExpressionType.StandalonePercent:
                     ProcessPercentCalculation();
                     break;
+                case ExpressionType.PercentFirstOperation: // НОВИЙ КЕЙС
+                    ProcessPercentFirstOperation();
+                    break;
                 case ExpressionType.RegularOperation:
                     ProcessRegularCalculation();
                     break;
-                case ExpressionType.SingleNumber: // Нова обробка
+                case ExpressionType.SingleNumber:
                     ProcessSingleNumber();
                     break;
                 default:
                     SetErrorState();
                     break;
+            }
+        }
+
+        private void ProcessPercentFirstOperation()
+        {
+            // Приклад:
+            // _fullExpression = "50% + " або "(-10%) * "
+            // _currentInput = "20"
+
+            // 1. Перевірка формату _fullExpression
+            var parts = _fullExpression.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2 || !parts[0].Contains('%') || !"+ - * /".Contains(parts[1]))
+            {
+                SetErrorState();
+                return;
+            }
+
+            // 2. Парсинг відсотка з автоматичним форматуванням
+            string percentStr = parts[0];
+            double percentNumber;
+            try
+            {
+                percentNumber = _formatter.Parse(_formatter.ExtractNumberFromPercent(percentStr));
+            }
+            catch
+            {
+                SetErrorState();
+                return;
+            }
+            string formattedPercent = _formatter.FormatPercentForHistory(percentNumber);
+
+            // 3. Парсинг другого числа
+            if (string.IsNullOrEmpty(_currentInput))
+            {
+                SetErrorState();
+                return;
+            }
+
+            double secondNumber;
+            try
+            {
+                secondNumber = _formatter.Parse(_currentInput);
+            }
+            catch
+            {
+                SetErrorState();
+                return;
+            }
+
+            // 4. Виконання операції
+            char op = parts[1][0];
+            try
+            {
+                _calculator.SetOperation(percentNumber / 100, op);
+                double result = _calculator.Calculate(secondNumber);
+
+                // 5. Форматування результату з урахуванням усіх особливостей
+                _currentInput = _formatter.FormatResultWithParentheses(result);
+                _fullExpression = _formatter.FormatExpression(
+                    leftPart: formattedPercent,
+                    operation: op.ToString(),
+                    rightPart: _formatter.FormatSecondOperand(secondNumber));
+            }
+            catch
+            {
+                SetErrorState();
             }
         }
 
@@ -447,9 +569,10 @@ namespace CalculatorCore
             bool currentEndsWithPercent = _currentInput.EndsWith('%');
             bool currentHasPercent = _currentInput.Contains('%');
             bool historyHasPercent = _fullExpression.Contains('%');
+            bool currentHasParentheses = _currentInput.StartsWith('(') && _currentInput.EndsWith(')');
 
             // 1. A% (Standalone)
-            if (currentEndsWithPercent && !hasOperator && !historyHasPercent)
+            if (currentEndsWithPercent && !hasOperator && !historyHasPercent || currentHasParentheses)
                 return ExpressionType.StandalonePercent;
 
             // 2. A + B% (Operation with percent)
@@ -460,11 +583,15 @@ namespace CalculatorCore
             if (currentHasPercent && !currentEndsWithPercent && !hasOperator)
                 return ExpressionType.PercentOfNumber;
 
-            // 4. Regular operation
+            // 4. A% + B (Percent first operation)
+            if (historyHasPercent && hasOperator && !currentEndsWithPercent)
+                return ExpressionType.PercentFirstOperation;
+
+            // 5. Regular operation
             if (hasOperator)
                 return ExpressionType.RegularOperation;
 
-            // 5. Single number (new case)
+            // 6. Single number
             if (!string.IsNullOrEmpty(_currentInput) && !hasOperator)
                 return ExpressionType.SingleNumber;
 

@@ -5,39 +5,83 @@ namespace CalculatorCore
 {
     public class ExpressionFormatter
     {
-        // 1. Метод для форматування чисел (на вивід)
+        // ==================== РОЗДІЛ 1: ФОРМАТУВАННЯ ЧИСЕЛ ДЛЯ ВІДОБРАЖЕННЯ ====================
+
+        // 1.1 Основний метод форматування чисел
         public string FormatDisplay(double number)
         {
-            // Змінюємо умову для наукової нотації
-            if (Math.Abs(number) >= 1_000_000_000_000 || (Math.Abs(number) < 0.00001 && number != 0))
+            // Обробка спеціальних значень
+            if (double.IsInfinity(number))
+                return number > 0 ? "∞" : "-∞";
+            if (double.IsNaN(number))
+                return "NaN";
+
+            // Визначення, чи потрібна наукова нотація
+            bool useScientific = ShouldUseScientificNotation(number);
+
+            if (useScientific)
             {
-                return number.ToString("0.##############E+0", CultureInfo.InvariantCulture);
+                return FormatScientific(number);
             }
-            return number.ToString("0.###############", CultureInfo.InvariantCulture);
+
+            return FormatRegular(number);
         }
 
+        // 1.2 Допоміжні методи для форматування чисел
+        private bool ShouldUseScientificNotation(double number)
+        {
+            return Math.Abs(number) >= 1_000_000_000 ||
+                   (Math.Abs(number) < 0.0000001 && number != 0) ||
+                   number.ToString(CultureInfo.InvariantCulture).Contains('E');
+        }
+
+        private string FormatScientific(double number)
+        {
+            string result = number.ToString("0.######E+0", CultureInfo.InvariantCulture);
+            result = result.Replace(".0E", "E").Replace(".E", "E");
+            return result;
+        }
+
+        private string FormatRegular(double number)
+        {
+            string formatted = number.ToString("0.###############", CultureInfo.InvariantCulture);
+
+            if (formatted.Contains('.'))
+            {
+                formatted = formatted.TrimEnd('0');
+                if (formatted.EndsWith("."))
+                    formatted = formatted[..^1];
+            }
+
+            if (double.IsInteger(number) && Math.Abs(number) < 1_000_000_000)
+            {
+                formatted = number.ToString("0", CultureInfo.InvariantCulture);
+            }
+
+            Debug.WriteLine($"FormatDisplay: {number} → {formatted}");
+            return formatted;
+        }
+
+        // 1.3 Форматування чисел з дужками для від'ємних значень
         public string FormatResultWithParentheses(double number)
         {
-            string formattedNumber = FormatDisplay(number); // Спочатку форматуємо число
-
+            string formattedNumber = FormatDisplay(number);
             if (!formattedNumber.StartsWith("- ") && number < 0)
             {
-                return $"({formattedNumber})"; // Додаємо дужки для від'ємних
+                return $"({formattedNumber})";
             }
-
-            return formattedNumber; // Без змін для додатних
+            return formattedNumber;
         }
 
-        // 2. Метод для парсингу чисел (з рядка)
+        // ==================== РОЗДІЛ 2: ПАРСИНГ ЧИСЕЛ З РЯДКІВ ====================
+
         public double Parse(string numberStr)
         {
             if (string.IsNullOrEmpty(numberStr))
                 return 0;
 
-            // Видаляємо дужки для від'ємних чисел
             string cleanNumber = numberStr.Replace("(", "").Replace(")", "").Trim();
 
-            // Якщо рядок закінчується на оператор (наприклад, "10 +"), видаляємо його
             if (cleanNumber.Length > 0 && "+-*/".Contains(cleanNumber[^1]))
             {
                 cleanNumber = cleanNumber[..^1].Trim();
@@ -49,27 +93,26 @@ namespace CalculatorCore
             return double.Parse(cleanNumber, CultureInfo.InvariantCulture);
         }
 
+        // ==================== РОЗДІЛ 3: ФОРМАТУВАННЯ ДЛЯ ІСТОРІЇ ОБЧИСЛЕНЬ ====================
+
         public string FormatForHistory(string numberStr)
         {
             if (string.IsNullOrEmpty(numberStr))
                 return "0";
 
-            // Якщо вже маємо коректні дужки (від'ємне число або відсоток у дужках)
+            if (numberStr.EndsWith('.'))
+                numberStr = numberStr[..^1];
+
             if (numberStr.StartsWith('(') && numberStr.EndsWith(')'))
                 return numberStr;
 
-            // Спеціальна обробка для відсотків
             if (numberStr.EndsWith('%'))
             {
-                // Для відсотків у дужках: (-5%) → залишаємо як є
-                if (numberStr.StartsWith("(-") && numberStr.EndsWith(")%"))
+                if (numberStr.StartsWith("(-") && numberStr.EndsWith(")%") || numberStr.EndsWith("%)"))
                     return numberStr;
-
-                // Для звичайних відсотків: -5% → залишаємо без дужок
                 return numberStr;
             }
 
-            // Для звичайних від'ємних чисел: -5 → (-5)
             if (numberStr.StartsWith('-'))
                 return $"({numberStr})";
 
@@ -83,67 +126,62 @@ namespace CalculatorCore
 
             if (rightPart.EndsWith('%'))
             {
-                formattedRight = rightPart; // Не змінюємо відсотки
+                formattedRight = rightPart;
             }
 
             return !string.IsNullOrEmpty(operation)
                 ? $"{formattedLeft} {operation} {formattedRight} ="
-                : $"{formattedLeft}{formattedRight} =";
+                : $"{formattedLeft} {formattedRight} =";
         }
+
+        // ==================== РОЗДІЛ 4: ФОРМАТУВАННЯ ВІДСОТКІВ ====================
 
         public string FormatSecondOperand(double number, string? originalInput = null, bool isPercent = false)
         {
             string formatted = FormatDisplay(number);
 
-            // 1. Обробка відсотків (пріоритетна)
             if (isPercent)
             {
                 return number < 0 ? $"({formatted}%)" : $"{formatted}%";
             }
 
-            // 2. Збереження оригінального формату (якщо передано)
             if (!string.IsNullOrEmpty(originalInput))
             {
                 bool wasParenthesized = originalInput.StartsWith('(') && originalInput.EndsWith(')');
                 if (wasParenthesized) return $"({formatted})";
             }
 
-            // 3. Стандартне форматування
             return number < 0 ? $"({formatted})" : formatted;
-        }
-
-        public bool IsPercentWithParentheses(string input)
-        {
-            return input.Contains(")%")
-                   && input.StartsWith('(')
-                   && input.IndexOf(')') == input.Length - 2;
-        }
-
-        public bool IsNegativePercent(string input)
-        {
-            return input.StartsWith('-') && input.EndsWith('%');
-        }
-
-        public bool IsParenthesizedNegativePercent(string input)
-        {
-            return input.StartsWith("(-") && input.EndsWith(")%");
         }
 
         public string ExtractNumberFromPercent(string input)
         {
-            if (IsParenthesizedNegativePercent(input))
-                return input.TrimStart('(').TrimEnd(')', '%');
+            if (string.IsNullOrEmpty(input))
+                return input;
 
-            if (IsNegativePercent(input) || input.EndsWith('%'))
-                return input.TrimEnd('%');
+            if (input.StartsWith("(-") && input.EndsWith("%)"))
+            {
+                return "-" + input.Substring(2, input.Length - 4);
+            }
+            else if (input.StartsWith('(') && input.EndsWith("%)"))
+            {
+                return input.Substring(1, input.Length - 3);
+            }
+            else if (input.EndsWith('%'))
+            {
+                return input.Substring(0, input.Length - 1);
+            }
 
             return input;
         }
 
         public string FormatPercentForHistory(double number)
         {
-            return number < 0 ? $"({FormatDisplay(number)}%)" : $"{FormatDisplay(number)}%";
+            string formatted = FormatDisplay(number);
+            return number < 0 ? $"({formatted}%)" : $"{formatted}%";
         }
+
+        // ==================== РОЗДІЛ 5: ОПЕРАЦІЇ ЗІ ЗНАКАМИ ====================
 
         public bool IsNegativeNumber(string input)
         {
@@ -152,37 +190,29 @@ namespace CalculatorCore
 
         public string ToggleSign(string input)
         {
-            Debug.WriteLine($"Input: '{input}'");
-
             if (string.IsNullOrEmpty(input))
                 return input;
 
-            // Якщо введення "0" або "(-0)", повертаємо "0"
             if (input == "0" || input == "(-0)")
                 return "0";
 
             bool isPercent = input.EndsWith('%');
 
-            // Випадок: -5% → 5%
             if (input.StartsWith('-') && isPercent && !input.StartsWith("(-"))
-                return input[1..]; // знімає лише перший мінус
+                return input[1..];
 
-            // Випадок: (-5%) → 5%
             if (input.StartsWith("(-") && isPercent)
-                return input[2..^2] + "%"; // знімає "(-" і ")" (але додає % назад)
+                return input[2..^2] + "%";
 
-            // Випадок: 5% → (-5)%
             if (isPercent)
             {
-                string number = input[..^1]; // без '%'
+                string number = input[..^1];
                 return $"(-{number}%)";
             }
 
-            // Випадок: (-5) → 5
             if (input.StartsWith("(-") && input.EndsWith(")"))
-                return input[2..^1]; // знімає дужки
+                return input[2..^1];
 
-            // Випадок: 5 → (-5)
             return $"(-{input})";
         }
     }
