@@ -13,7 +13,7 @@
             {
 #if WINDOWS
                 Width = 300,
-                Height = 600,
+                Height = 620,
 #endif
                 Title = "Calculator App"
             };

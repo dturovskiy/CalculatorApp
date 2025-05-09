@@ -46,7 +46,7 @@
         [Theory]
         [InlineData("1", '+', "5", "1.05")]  // 1 + 5% від 1 = 1.05
         [InlineData("1", '-', "5", "0.95")]   // 1 - 5% від 1 = 0.95
-        [InlineData("2", '*', "5", "0.1")]    // 2 * 5% = 0.1
+        [InlineData("2", '×', "5", "0.1")]    // 2 × 5% = 0.1
         [InlineData("1", '/', "5", "20")]     // 1 / 5% = 20
         public void PercentSecondOperand_Operations_ReturnsCorrectResult(string a, char op, string b, string expected)
         {
@@ -62,7 +62,7 @@
         [Theory]
         [InlineData("5", '+', "3", "(-2)")]    // -5 + 3 = -2
         [InlineData("5", '-', "3", "(-8)")]    // -5 - 3 = -8
-        [InlineData("5", '*', "3", "(-15)")]   // -5 * 3 = -15
+        [InlineData("5", '×', "3", "(-15)")]   // -5 × 3 = -15
         [InlineData("6", '/', "2", "(-3)")]    // -6 / 2 = -3
         public void NegativeFirstOperand_Operations_ReturnsCorrectResult(string a, char op, string b, string expected)
         {
